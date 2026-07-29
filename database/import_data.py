@@ -7,7 +7,7 @@ from config.mongodb import db
 
 try:
     df = pd.read_csv("data/amazon_dataset_half.csv")
-
+    print(df.columns.tolist())
     print("✅ Dataset loaded successfully.")
     print(f"Total Records : {len(df)}")
 
