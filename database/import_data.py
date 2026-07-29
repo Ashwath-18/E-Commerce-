@@ -2,15 +2,15 @@ import pandas as pd
 from config.mongodb import db
 
 # -------------------------------
-# Load Excel Dataset
+# Load Dataset
 # -------------------------------
 
-file_path = "dataset/amazon_ecommerce.xlsx"
-
 try:
-    df = pd.read_excel(file_path)
+    df = pd.read_csv("data/amazon_dataset_half.csv")
+
     print("✅ Dataset loaded successfully.")
     print(f"Total Records : {len(df)}")
+
 except Exception as e:
     print("❌ Error loading dataset")
     print(e)
