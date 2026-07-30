@@ -25,8 +25,7 @@ order_items = db["OrderItems"]
 # ---------------------------
 
 def insert_user(data):
-    if not users.find_one({"user_id": data["user_id"]}):
-        users.insert_one(data)
+    users.insert_one(data)
 
 
 # ---------------------------
@@ -34,8 +33,7 @@ def insert_user(data):
 # ---------------------------
 
 def insert_product(data):
-    if not products.find_one({"product_id": data["product_id"]}):
-        products.insert_one(data)
+    products.insert_one(data)
 
 
 # ---------------------------
@@ -43,8 +41,7 @@ def insert_product(data):
 # ---------------------------
 
 def insert_seller(data):
-    if not sellers.find_one({"seller_id": data["seller_id"]}):
-        sellers.insert_one(data)
+    sellers.insert_one(data)
 
 
 # ---------------------------
@@ -52,8 +49,7 @@ def insert_seller(data):
 # ---------------------------
 
 def insert_category(data):
-    if not categories.find_one({"category": data["category"]}):
-        categories.insert_one(data)
+    categories.insert_one(data)
 
 
 # ---------------------------
@@ -61,12 +57,7 @@ def insert_category(data):
 # ---------------------------
 
 def insert_subcategory(data):
-    if not subcategories.find_one({
-        "category": data["category"],
-        "subcategory": data["subcategory"]
-    }):
-        subcategories.insert_one(data)
-
+    subcategories.insert_one(data)
 
 # ---------------------------
 # Orders
