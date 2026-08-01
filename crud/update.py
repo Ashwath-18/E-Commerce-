@@ -20,10 +20,12 @@ def update_product_price(product_id, new_price):
         {"$set": {"price": new_price}}
     )
 
-    if result.modified_count:
-        print("Product price updated successfully.")
+    if result.matched_count == 0:
+        print("Product not found.")
+    elif result.modified_count == 0:
+        print("Price is already the same.")
     else:
-        print("Product not found or price unchanged.")
+        print("Product price updated successfully.")
 
 
 # -----------------------------
@@ -36,10 +38,12 @@ def update_product_stock(product_id, new_stock):
         {"$set": {"stock": new_stock}}
     )
 
-    if result.modified_count:
-        print("Product stock updated successfully.")
+    if result.matched_count == 0:
+        print("Product not found.")
+    elif result.modified_count == 0:
+        print("Stock is already the same.")
     else:
-        print("Product not found or stock unchanged.")
+        print("Product stock updated successfully.")
 
 
 # -----------------------------
@@ -52,10 +56,12 @@ def update_product_rating(product_id, new_rating):
         {"$set": {"rating": new_rating}}
     )
 
-    if result.modified_count:
-        print("Product rating updated successfully.")
+    if result.matched_count == 0:
+        print("Product not found.")
+    elif result.modified_count == 0:
+        print("Rating is already the same.")
     else:
-        print("Product not found or rating unchanged.")
+        print("Product rating updated successfully.")
 
 
 # -----------------------------
@@ -68,10 +74,12 @@ def update_seller_rating(seller_id, new_rating):
         {"$set": {"seller_rating": new_rating}}
     )
 
-    if result.modified_count:
-        print("Seller rating updated successfully.")
+    if result.matched_count == 0:
+        print("Seller not found.")
+    elif result.modified_count == 0:
+        print("Seller rating is already the same.")
     else:
-        print("Seller not found or rating unchanged.")
+        print("Seller rating updated successfully.")
 
 
 # -----------------------------
@@ -91,7 +99,9 @@ def update_delivery_status(user_id, product_id, new_status):
         }
     )
 
-    if result.modified_count:
-        print("Delivery status updated successfully.")
+    if result.matched_count == 0:
+        print("Order not found.")
+    elif result.modified_count == 0:
+        print("Delivery status is already the same.")
     else:
-        print("Order not found or status unchanged.")
+        print("Delivery status updated successfully.")
