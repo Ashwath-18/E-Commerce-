@@ -137,7 +137,7 @@ class EcommerceApp(ctk.CTk):
 
         title = ctk.CTkLabel(
             title_frame,
-            text="E-Com Admin",
+            text="CARTIFY",
             font=("Segoe UI", 26, "bold"),
             text_color=ACCENT
         )
@@ -146,7 +146,7 @@ class EcommerceApp(ctk.CTk):
 
         subtitle = ctk.CTkLabel(
             title_frame,
-            text="Smart Commerce Platform",
+            text="Smart E-Commerce Platform",
             font=("Segoe UI", 13),
             text_color=TEXT_LIGHT
         )
