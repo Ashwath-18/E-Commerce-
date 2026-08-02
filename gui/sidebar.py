@@ -98,7 +98,12 @@ class Sidebar(ctk.CTkFrame):
 
         # ---------------- Button Function ----------------
 
-        def add_button(text, icon_file, color="transparent"):
+        def add_button(
+            text,
+            icon_file,
+            command=None,
+            color="transparent"
+        ):
 
             icon = ctk.CTkImage(
                 Image.open(
@@ -120,7 +125,8 @@ class Sidebar(ctk.CTkFrame):
                 fg_color=color,
                 hover_color=HOVER,
                 text_color=ACCENT,
-                font=("Segoe UI", 15, "bold")
+                font=("Segoe UI", 15, "bold"),
+                command=command
             )
 
             button.pack(
@@ -129,56 +135,67 @@ class Sidebar(ctk.CTkFrame):
             )
 
             self.buttons[text] = button
+
             return button
 
         add_button(
             "Products",
-            "products.png"
+            "products.png",
+            command=lambda: self.master.show_page("products")
         )
 
         add_button(
             "Database",
-            "database.png"
+            "database.png",
+            command=lambda: self.master.show_page("database")
         )
 
         add_button(
             "Orders",
-            "orders.png"
+            "orders.png",
+            command=lambda: self.master.show_page("orders")
         )
 
         add_button(
             "Shipping",
-            "shipping.png"
+            "shipping.png",
+            command=lambda: self.master.show_page("shipping")
         )
 
         add_button(
             "Users",
-            "users.png"
+            "users.png",
+            command=lambda: self.master.show_page("users")
         )
 
         add_button(
             "Reviews",
-            "reviews.png"
+            "reviews.png",
+            command=lambda: self.master.show_page("reviews")
         )
 
         add_button(
             "Search",
-            "search.png"
+            "search.png",
+            command=lambda: self.master.show_page("search")
         )
 
         add_button(
             "AI Assistant",
-            "ai.png"
+            "ai.png",
+            command=lambda: self.master.show_page("ai")
         )
 
         add_button(
             "Analytics",
-            "analytics.png"
+            "analytics.png",
+            command=lambda: self.master.show_page("analytics")
         )
 
         add_button(
             "Settings",
-            "settings.png"
+            "settings.png",
+            command=lambda: self.master.show_page("settings")
         )
 
         # ---------------- Logout ----------------

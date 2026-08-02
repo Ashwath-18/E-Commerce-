@@ -4,12 +4,18 @@ from PIL import Image
 
 from gui.theme import *
 from gui.sidebar import Sidebar
-from database.dashboard_stats import (
-    total_products,
-    total_users,
-    total_orders,
-    total_reviews
-)
+
+from gui.dashboard import DashboardPage
+from gui.products import ProductsPage
+from gui.database import DatabasePage
+from gui.orders import OrdersPage
+from gui.shipping import ShippingPage
+from gui.users import UsersPage
+from gui.reviews import ReviewsPage
+from gui.search import SearchPage
+from gui.ai_assistant import AIAssistantPage
+from gui.analytics import AnalyticsPage
+from gui.settings import SettingsPage
 
 
 class EcommerceApp(ctk.CTk):
@@ -181,118 +187,39 @@ class EcommerceApp(ctk.CTk):
             pady=(0, 20)
         )
 
+        self.pages = {}
+
         # --------------------------------------------------
-        # Welcome Card
+        # Register Pages
         # --------------------------------------------------
 
-        self.welcome = ctk.CTkFrame(
-            self.content,
-            fg_color=CARD,
-            corner_radius=20
-        )
+        self.pages["dashboard"] = DashboardPage(self.content)
+        self.pages["products"] = ProductsPage(self.content)
+        self.pages["database"] = DatabasePage(self.content)
+        self.pages["orders"] = OrdersPage(self.content)
+        self.pages["shipping"] = ShippingPage(self.content)
+        self.pages["users"] = UsersPage(self.content)
+        self.pages["reviews"] = ReviewsPage(self.content)
+        self.pages["search"] = SearchPage(self.content)
+        self.pages["ai"] = AIAssistantPage(self.content)
+        self.pages["analytics"] = AnalyticsPage(self.content)
+        self.pages["settings"] = SettingsPage(self.content)
 
-        self.welcome.pack(
+        self.show_page("dashboard")
+
+    def show_page(self, page_name):
+
+        # Hide all pages
+        for page in self.pages.values():
+            page.pack_forget()
+
+        # Show selected page
+        page = self.pages[page_name]
+
+        page.pack(
             fill="both",
             expand=True
         )
-
-        # ---------------- Top Statistics ----------------
-
-        stats = ctk.CTkFrame(
-            self.welcome,
-            fg_color="transparent"
-        )
-
-        stats.pack(
-            fill="x",
-            padx=30,
-            pady=(30, 20)
-        )
-
-
-        def create_card(parent, title, value):
-
-            card = ctk.CTkFrame(
-                parent,
-                width=220,
-                height=110,
-                fg_color="#FFF8F1",
-                corner_radius=18
-            )
-
-            card.pack(
-                side="left",
-                padx=12,
-                expand=True,
-                fill="both"
-            )
-
-            card.pack_propagate(False)
-
-            value_label = ctk.CTkLabel(
-                card,
-                text=value,
-                font=("Segoe UI", 26, "bold"),
-                text_color=ACCENT
-            )
-
-            value_label.pack(
-                pady=(18, 5)
-            )
-
-            title_label = ctk.CTkLabel(
-                card,
-                text=title,
-                font=("Segoe UI", 14),
-                text_color=TEXT_LIGHT
-            )
-
-            title_label.pack()
-
-
-        create_card(
-            stats,
-            "Products",
-            str(total_products())
-        )
-
-        create_card(
-            stats,
-            "Users",
-            str(total_users())
-        )
-
-        create_card(
-            stats,
-            "Orders",
-            str(total_orders())
-        )
-
-        create_card(
-            stats,
-            "Reviews",
-            str(total_reviews())
-        )
-
-        welcome_title = ctk.CTkLabel(
-            self.welcome,
-            text="Welcome to E-Com Admin",
-            font=("Segoe UI", 28, "bold"),
-            text_color=ACCENT
-        )
-
-        welcome_title.pack(
-            pady=(120, 10)
-        )
-
-        welcome_subtitle = ctk.CTkLabel(
-            self.welcome,
-            text="Professional E-Commerce Management Dashboard",
-            font=("Segoe UI", 18),
-            text_color=TEXT_LIGHT
-        )
-
-        welcome_subtitle.pack()
 
 
 if __name__ == "__main__":
