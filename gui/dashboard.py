@@ -98,7 +98,7 @@ class DashboardPage(ctk.CTkFrame):
 
         welcome_title = ctk.CTkLabel(
             self,
-            text="Welcome to E-Com Admin",
+            text="Welcome to Cartify",
             font=("Segoe UI", 28, "bold"),
             text_color=ACCENT
         )
@@ -109,7 +109,7 @@ class DashboardPage(ctk.CTkFrame):
 
         welcome_subtitle = ctk.CTkLabel(
             self,
-            text="Professional E-Commerce Management Dashboard",
+            text="Cartify Management Dashboard",
             font=("Segoe UI", 18),
             text_color=TEXT_LIGHT
         )

@@ -27,7 +27,7 @@ class EcommerceApp(ctk.CTk):
         # Window
         # --------------------------------------------------
 
-        self.title("E-Com Admin")
+        self.title("Cartify")
 
         self.geometry("1500x850")
 

@@ -2,7 +2,7 @@
 
 Database : MongoDB
 
-Project :
+Project : Cartify
 Real-Time E-commerce Management System
 
 Purpose :

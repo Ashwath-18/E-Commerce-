@@ -4,6 +4,6 @@ from pymongo import MongoClient
 client = MongoClient("mongodb://localhost:27017/")
 
 # Create / Connect to Database
-db = client["AmazonDB"]
+db = client["CartifyDB"]
 
 print("Connected to MongoDB Successfully!")
