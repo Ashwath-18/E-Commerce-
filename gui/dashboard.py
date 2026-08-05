@@ -11,107 +11,74 @@ from database.dashboard_stats import (
 class DashboardPage(ctk.CTkFrame):
 
     def __init__(self, master):
+        super().__init__(master, fg_color="transparent")
 
-        super().__init__(
-            master,
-            fg_color=CARD,
-            corner_radius=20
-        )
+        # -------- Stat Cards Row --------
+        stats = ctk.CTkFrame(self, fg_color="transparent")
+        stats.pack(fill="x", padx=0, pady=(0, 20))
 
-        # ---------------- Top Statistics ----------------
+        stats.grid_columnconfigure((0, 1, 2, 3), weight=1, uniform="stat")
 
-        stats = ctk.CTkFrame(
-            self,
-            fg_color="transparent"
-        )
-
-        stats.pack(
-            fill="x",
-            padx=30,
-            pady=(30, 20)
-        )
-
-
-        def create_card(parent, title, value):
+        def create_card(col, icon_char, title, value):
 
             card = ctk.CTkFrame(
-                parent,
-                width=220,
-                height=110,
-                fg_color="#FFF8F1",
-                corner_radius=18
+                stats,
+                fg_color=CARD,
+                corner_radius=CARD_RADIUS,
+                border_width=1,
+                border_color=BORDER
+            )
+            card.grid(
+                row=0, column=col,
+                padx=8, pady=0,
+                sticky="nsew"
             )
 
-            card.pack(
-                side="left",
-                padx=12,
-                expand=True,
-                fill="both"
+            icon_badge = ctk.CTkLabel(
+                card,
+                text=icon_char,
+                font=("Segoe UI", 22),
+                text_color=CARD,
+                fg_color=ACCENT,
+                corner_radius=14,
+                width=48, height=48
             )
-
-            card.pack_propagate(False)
+            icon_badge.pack(anchor="w", padx=24, pady=(24, 16))
 
             value_label = ctk.CTkLabel(
-                card,
-                text=value,
-                font=("Segoe UI", 26, "bold"),
-                text_color=ACCENT
+                card, text=value, font=STAT_FONT, text_color=ACCENT
             )
-
-            value_label.pack(
-                pady=(18, 5)
-            )
+            value_label.pack(anchor="w", padx=24)
 
             title_label = ctk.CTkLabel(
-                card,
-                text=title,
-                font=("Segoe UI", 14),
-                text_color=TEXT_LIGHT
+                card, text=title, font=LABEL_FONT, text_color=TEXT_LIGHT
             )
+            title_label.pack(anchor="w", padx=24, pady=(2, 24))
 
-            title_label.pack()
+        create_card(0, "📦", "Products", str(total_products()))
+        create_card(1, "👥", "Users", str(total_users()))
+        create_card(2, "🛒", "Orders", str(total_orders()))
+        create_card(3, "⭐", "Reviews", str(total_reviews()))
 
-
-        create_card(
-            stats,
-            "Products",
-            str(total_products())
-        )
-
-        create_card(
-            stats,
-            "Users",
-            str(total_users())
-        )
-
-        create_card(
-            stats,
-            "Orders",
-            str(total_orders())
-        )
-
-        create_card(
-            stats,
-            "Reviews",
-            str(total_reviews())
-        )
-
-        welcome_title = ctk.CTkLabel(
+        # -------- Welcome Panel --------
+        hero = ctk.CTkFrame(
             self,
-            text="Welcome to Cartify",
-            font=("Segoe UI", 28, "bold"),
-            text_color=ACCENT
+            fg_color=CARD,
+            corner_radius=CARD_RADIUS,
+            border_width=1,
+            border_color=BORDER
         )
+        hero.pack(fill="both", expand=True, padx=0, pady=(0, 0))
 
-        welcome_title.pack(
-            pady=(60, 10)
-        )
+        ctk.CTkLabel(
+            hero, text="Welcome to Cartify",
+            font=("Segoe UI", 30, "bold"), text_color=ACCENT
+        ).pack(pady=(70, 8))
 
-        welcome_subtitle = ctk.CTkLabel(
-            self,
-            text="Cartify Management Dashboard",
-            font=("Segoe UI", 18),
-            text_color=TEXT_LIGHT
-        )
+        ctk.CTkLabel(
+            hero, text="Smart E-Commerce Management Dashboard",
+            font=("Segoe UI", 15), text_color=TEXT_LIGHT
+        ).pack()
 
-        welcome_subtitle.pack()
+        divider = ctk.CTkFrame(hero, height=3, width=60, fg_color=PRIMARY, corner_radius=2)
+        divider.pack(pady=20)

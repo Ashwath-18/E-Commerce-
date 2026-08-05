@@ -11,7 +11,7 @@ class Sidebar(ctk.CTkFrame):
 
         super().__init__(
             master,
-            width=280,
+            width=SIDEBAR_WIDTH,
             fg_color=SIDEBAR,
             corner_radius=0
         )
@@ -32,6 +32,7 @@ class Sidebar(ctk.CTkFrame):
         )
 
         self.buttons = {}
+        self.active_page = None
 
         # ---------------- Logo ----------------
 
@@ -60,8 +61,8 @@ class Sidebar(ctk.CTkFrame):
         self.title = ctk.CTkLabel(
             self,
             text="Dashboard",
-            font=("Segoe UI", 26, "bold"),
-            text_color=ACCENT
+            font=("Segoe UI", 24, "bold"),
+            text_color=SIDEBAR_TEXT
         )
 
         self.title.pack(
@@ -71,13 +72,13 @@ class Sidebar(ctk.CTkFrame):
         line = ctk.CTkFrame(
             self,
             height=1,
-            fg_color="#D8C8B8"
+            fg_color=BORDER
         )
 
         line.pack(
             fill="x",
             padx=18,
-            pady=(0, 12)
+            pady=(0, 16)
         )
 
         # ---------------- Scrollable Menu ----------------
@@ -85,8 +86,8 @@ class Sidebar(ctk.CTkFrame):
         self.nav = ctk.CTkScrollableFrame(
             self,
             fg_color="transparent",
-            scrollbar_button_color="#C6A27A",
-            scrollbar_button_hover_color="#B89369"
+            scrollbar_button_color=BORDER,
+            scrollbar_button_hover_color=PRIMARY
         )
 
         self.nav.pack(
@@ -98,12 +99,7 @@ class Sidebar(ctk.CTkFrame):
 
         # ---------------- Button Function ----------------
 
-        def add_button(
-            text,
-            icon_file,
-            command=None,
-            color="transparent"
-        ):
+        def add_button(text, icon_file, page_key, command=None):
 
             icon = ctk.CTkImage(
                 Image.open(
@@ -112,7 +108,7 @@ class Sidebar(ctk.CTkFrame):
                         icon_file
                     )
                 ),
-                size=(38, 38)
+                size=ICON_SIZE
             )
 
             button = ctk.CTkButton(
@@ -120,81 +116,72 @@ class Sidebar(ctk.CTkFrame):
                 text="   " + text,
                 image=icon,
                 anchor="w",
-                height=50,
+                height=BUTTON_HEIGHT,
                 corner_radius=14,
-                fg_color=color,
+                fg_color="transparent",
                 hover_color=HOVER,
-                text_color=ACCENT,
-                font=("Segoe UI", 15, "bold"),
-                command=command
+                text_color=SIDEBAR_TEXT_MUTED,
+                font=("Segoe UI", 14, "bold"),
+                command=lambda: self.select(page_key, command)
             )
 
             button.pack(
                 fill="x",
-                pady=3
+                pady=4,
+                padx=6
             )
 
-            self.buttons[text] = button
+            self.buttons[page_key] = button
 
             return button
 
         add_button(
-            "Products",
-            "products.png",
+            "Products", "products.png", "products",
             command=lambda: self.master.show_page("products")
         )
 
         add_button(
-            "Database",
-            "database.png",
+            "Database", "database.png", "database",
             command=lambda: self.master.show_page("database")
         )
 
         add_button(
-            "Orders",
-            "orders.png",
+            "Orders", "orders.png", "orders",
             command=lambda: self.master.show_page("orders")
         )
 
         add_button(
-            "Shipping",
-            "shipping.png",
+            "Shipping", "shipping.png", "shipping",
             command=lambda: self.master.show_page("shipping")
         )
 
         add_button(
-            "Users",
-            "users.png",
+            "Users", "users.png", "users",
             command=lambda: self.master.show_page("users")
         )
 
         add_button(
-            "Reviews",
-            "reviews.png",
+            "Reviews", "reviews.png", "reviews",
             command=lambda: self.master.show_page("reviews")
         )
 
         add_button(
-            "Search",
-            "search.png",
+            "Search", "search.png", "search",
             command=lambda: self.master.show_page("search")
         )
 
         add_button(
-            "AI Assistant",
-            "ai.png",
+            "AI Assistant", "ai.png", "ai",
             command=lambda: self.master.show_page("ai")
         )
 
         add_button(
-            "Analytics",
-            "analytics.png",
+            "Analytics", "analytics.png", "analytics",
             command=lambda: self.master.show_page("analytics")
         )
 
         add_button(
-            "Settings",
-            "settings.png",
+            "Settings", "settings.png", "settings",
             command=lambda: self.master.show_page("settings")
         )
 
@@ -207,7 +194,7 @@ class Sidebar(ctk.CTkFrame):
                     "logout.png"
                 )
             ),
-            size=(38, 38)
+            size=ICON_SIZE
         )
 
         self.logout_button = ctk.CTkButton(
@@ -215,19 +202,45 @@ class Sidebar(ctk.CTkFrame):
             text="   Logout",
             image=logout_icon,
             anchor="w",
-            height=50,
+            height=BUTTON_HEIGHT,
             corner_radius=14,
             fg_color="transparent",
             hover_color=HOVER,
-            text_color=ACCENT,
-            font=("Segoe UI", 15, "bold"),
+            text_color=SIDEBAR_TEXT_MUTED,
+            font=("Segoe UI", 14, "bold"),
             command=self.logout
         )
 
         self.logout_button.pack(
             fill="x",
-            pady=(3, 8)
+            pady=(3, 8),
+            padx=6
         )
+
+        # Default active page on launch
+        self.select("dashboard", None)
+        self.active_page = "dashboard"
+
+    # ---------------- Active State Handler ----------------
+
+    def select(self, page_key, command):
+
+        for key, btn in self.buttons.items():
+            btn.configure(
+                fg_color="transparent",
+                text_color=SIDEBAR_TEXT_MUTED
+            )
+
+        if page_key in self.buttons:
+            self.buttons[page_key].configure(
+                fg_color=SIDEBAR_ACTIVE_BG,
+                text_color=SIDEBAR_ACTIVE_TEXT
+            )
+
+        self.active_page = page_key
+
+        if command:
+            command()
 
     # ---------------- Logout Handler ----------------
 

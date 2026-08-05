@@ -80,9 +80,11 @@ class EcommerceApp(ctk.CTk):
 
         self.header = ctk.CTkFrame(
             self.main_frame,
-            height=80,
+            height=90,
             fg_color=CARD,
-            corner_radius=15
+            corner_radius=CARD_RADIUS,
+            border_width=1,
+            border_color=BORDER
         )
 
         self.header.grid(
@@ -154,20 +156,20 @@ class EcommerceApp(ctk.CTk):
         subtitle.pack(anchor="w")
 
         # --------------------------------------------------
-        # Admin Label
+        # Admin Label (icon-circle removed, clean text only)
         # --------------------------------------------------
 
         self.admin = ctk.CTkLabel(
             self.header,
             text="Administrator",
             font=BUTTON_FONT,
-            text_color=TEXT_LIGHT
+            text_color=ACCENT
         )
 
         self.admin.grid(
             row=0,
             column=1,
-            padx=25
+            padx=30
         )
 
         # --------------------------------------------------
