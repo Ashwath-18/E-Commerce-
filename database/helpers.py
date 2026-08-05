@@ -25,7 +25,7 @@ order_items = db["OrderItems"]
 # ---------------------------
 
 def insert_user(data):
-    users.insert_one(data)
+    users.insert_many(data)
 
 
 # ---------------------------
@@ -33,7 +33,7 @@ def insert_user(data):
 # ---------------------------
 
 def insert_product(data):
-    products.insert_one(data)
+    products.insert_many(data)
 
 
 # ---------------------------
@@ -41,7 +41,7 @@ def insert_product(data):
 # ---------------------------
 
 def insert_seller(data):
-    sellers.insert_one(data)
+    sellers.insert_many(data)
 
 
 # ---------------------------
@@ -49,7 +49,7 @@ def insert_seller(data):
 # ---------------------------
 
 def insert_category(data):
-    categories.insert_one(data)
+    categories.insert_many(data)
 
 
 # ---------------------------
@@ -57,14 +57,14 @@ def insert_category(data):
 # ---------------------------
 
 def insert_subcategory(data):
-    subcategories.insert_one(data)
+    subcategories.insert_many(data)
 
 # ---------------------------
 # Orders
 # ---------------------------
 
 def insert_order(data):
-    orders.insert_one(data)
+    orders.insert_many(data)
 
 
 # ---------------------------
@@ -72,7 +72,7 @@ def insert_order(data):
 # ---------------------------
 
 def insert_payment(data):
-    payments.insert_one(data)
+    payments.insert_many(data)
 
 
 # ---------------------------
@@ -80,7 +80,7 @@ def insert_payment(data):
 # ---------------------------
 
 def insert_shipping(data):
-    shipping.insert_one(data)
+    shipping.insert_many(data)
 
 
 # ---------------------------
@@ -88,7 +88,7 @@ def insert_shipping(data):
 # ---------------------------
 
 def insert_review(data):
-    reviews.insert_one(data)
+    reviews.insert_many(data)
 
 
 # ---------------------------
@@ -96,7 +96,7 @@ def insert_review(data):
 # ---------------------------
 
 def insert_inventory(data):
-    inventory.insert_one(data)
+    inventory.insert_many(data)
 
 
 # ---------------------------
@@ -104,7 +104,7 @@ def insert_inventory(data):
 # ---------------------------
 
 def insert_return(data):
-    returns.insert_one(data)
+    returns.insert_many(data)
 
 
 # ---------------------------
@@ -112,4 +112,4 @@ def insert_return(data):
 # ---------------------------
 
 def insert_order_item(data):
-    order_items.insert_one(data)
+    order_items.insert_many(data)
