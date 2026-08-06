@@ -1,8 +1,13 @@
-from gui.main import EcommerceApp
+from gui.windows.main_window import CartifyWindow
 
-def main():
-    app = EcommerceApp()
-    app.mainloop()
+from PySide6.QtWidgets import QApplication
 
-if __name__ == "__main__":
-    main()
+import sys
+
+app = QApplication(sys.argv)
+
+window = CartifyWindow()
+
+window.show()
+
+sys.exit(app.exec())
