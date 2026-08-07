@@ -1,0 +1,247 @@
+/* ===================================================
+   Cartify — Light Theme (Pure White / Violet Accent)
+   =================================================== */
+
+QWidget {
+    background-color: #FFFFFF;
+    color: #0A0A0A;
+    font-family: "Segoe UI";
+    font-size: 13px;
+}
+
+QMainWindow {
+    background-color: #FFFFFF;
+}
+
+/* ---------------- Sidebar (soft glass) ---------------- */
+
+#Sidebar {
+    background-color: rgba(255, 255, 255, 0.78);
+    border-right: 1px solid rgba(234, 234, 234, 0.7);
+}
+
+#SidebarTitle {
+    color: #0A0A0A;
+    font-size: 20px;
+    font-weight: 700;
+    padding: 4px 0 14px 0;
+}
+
+#SidebarDivider {
+    background-color: #EAEAEA;
+    max-height: 1px;
+    margin: 0 20px 14px 20px;
+}
+
+QPushButton#NavButton {
+    background-color: transparent;
+    color: #8A8A8A;
+    text-align: left;
+    padding-left: 18px;
+    border-radius: 12px;
+    border-left: 4px solid transparent;
+    font-size: 14px;
+    font-weight: 600;
+}
+
+QPushButton#NavButton:hover {
+    background-color: #F5F5F7;
+    color: #0A0A0A;
+}
+
+QPushButton#NavButton:checked {
+    background-color: #F1EEFF;
+    color: #5A3DFF;
+    border-left: 4px solid #5A3DFF;
+    font-weight: 700;
+}
+
+/* ---------------- Navbar / Header (soft glass) ---------------- */
+
+#Navbar {
+    background-color: rgba(255, 255, 255, 0.72);
+    border: 1px solid rgba(234, 234, 234, 0.7);
+    border-radius: 18px;
+}
+
+#NavbarTitle {
+    color: #5A3DFF;
+    font-size: 32px;
+    font-weight: 800;
+}
+
+#NavbarSubtitle {
+    color: #6B7280;
+    font-size: 13px;
+}
+
+#NavbarAdmin {
+    color: #222222;
+    font-weight: 600;
+}
+
+#AdminAvatar {
+    background-color: #5A3DFF;
+    color: #FFFFFF;
+    border-radius: 18px;
+    font-weight: 700;
+    font-size: 15px;
+}
+
+/* ---------------- Cards ---------------- */
+
+#Card, #StatCard, #ChartCard {
+    background-color: #FFFFFF;
+    border: 1px solid #EAEAEA;
+    border-radius: 18px;
+}
+
+#StatIconBadge {
+    background-color: #5A3DFF;
+    color: #FFFFFF;
+    border-radius: 24px;
+    font-size: 19px;
+}
+
+#StatValue {
+    color: #0A0A0A;
+    font-size: 30px;
+    font-weight: 800;
+}
+
+#StatTitle {
+    color: #6B7280;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+/* ---------------- Buttons ---------------- */
+
+QPushButton#PrimaryButton {
+    background-color: #5A3DFF;
+    color: #FFFFFF;
+    border-radius: 10px;
+    padding: 10px 18px;
+    font-weight: 700;
+    border: none;
+}
+
+QPushButton#PrimaryButton:hover {
+    background-color: #4A2FE0;
+}
+
+QPushButton#SecondaryButton {
+    background-color: #FFFFFF;
+    color: #0A0A0A;
+    border: 1px solid #DADADA;
+    border-radius: 10px;
+    padding: 10px 18px;
+    font-weight: 700;
+}
+
+QPushButton#SecondaryButton:hover {
+    background-color: #F5F5F7;
+}
+
+QPushButton#DangerButton {
+    background-color: #DC2626;
+    color: #FFFFFF;
+    border-radius: 10px;
+    padding: 10px 18px;
+    font-weight: 700;
+    border: none;
+}
+
+QPushButton#DangerButton:hover {
+    background-color: #B91C1C;
+}
+
+/* ---------------- Inputs ---------------- */
+
+QLineEdit, QComboBox, QDoubleSpinBox, QSpinBox, QTextEdit {
+    background-color: #FFFFFF;
+    border: 1px solid #DADADA;
+    border-radius: 10px;
+    padding: 8px 12px;
+    color: #0A0A0A;
+    selection-background-color: #5A3DFF;
+    selection-color: #FFFFFF;
+}
+
+QLineEdit:focus, QComboBox:focus, QDoubleSpinBox:focus, QSpinBox:focus, QTextEdit:focus {
+    border: 1px solid #5A3DFF;
+}
+
+#SearchBar {
+    background-color: #FFFFFF;
+    border: 1px solid #DADADA;
+    border-radius: 22px;
+    padding: 8px 18px;
+}
+
+/* ---------------- Table ---------------- */
+
+QTableWidget {
+    background-color: #FFFFFF;
+    border: 1px solid #EAEAEA;
+    border-radius: 16px;
+    gridline-color: #F0F0F0;
+    selection-background-color: #F1EEFF;
+    selection-color: #0A0A0A;
+}
+
+QHeaderView::section {
+    background-color: #FAFAFA;
+    color: #0A0A0A;
+    padding: 12px 10px;
+    border: none;
+    border-bottom: 1px solid #EAEAEA;
+    font-weight: 700;
+}
+
+QTableWidget::item {
+    padding: 8px;
+}
+
+/* ---------------- Scrollbars ---------------- */
+
+QScrollBar:vertical {
+    background: transparent;
+    width: 10px;
+    margin: 0;
+}
+
+QScrollBar::handle:vertical {
+    background: #DADADA;
+    border-radius: 5px;
+    min-height: 30px;
+}
+
+QScrollBar::handle:vertical:hover {
+    background: #5A3DFF;
+}
+
+QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
+    height: 0;
+}
+
+/* ---------------- Misc ---------------- */
+
+QLabel#PageTitle {
+    color: #0A0A0A;
+    font-size: 27px;
+    font-weight: 800;
+}
+
+QLabel#PageSubtitle {
+    color: #6B7280;
+    font-size: 14px;
+}
+
+QToolTip {
+    background-color: #0A0A0A;
+    color: #FFFFFF;
+    border: none;
+    padding: 6px;
+    border-radius: 6px;
+}
