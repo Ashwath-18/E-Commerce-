@@ -59,7 +59,7 @@ class DatabasePage(QWidget):
             row, col = divmod(i, 2)
 
             name_label = QLabel(name)
-            name_label.setObjectName("PageSubtitle")
+            name_label.setObjectName("PanelLabel")
 
             count_label = QLabel("—")
             count_label.setObjectName("StatValue")
@@ -69,6 +69,7 @@ class DatabasePage(QWidget):
             box.addWidget(count_label)
 
             wrapper = QWidget()
+            wrapper.setObjectName("MetricTile")
             wrapper.setLayout(box)
 
             self.grid.addWidget(wrapper, row, col)

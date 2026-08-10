@@ -124,6 +124,7 @@ class SearchPage(QWidget):
         detail_layout.setContentsMargins(22, 18, 22, 18)
 
         self.product_detail = QLabel()
+        self.product_detail.setObjectName("DetailText")
         self.product_detail.setWordWrap(True)
         self.product_detail.setTextFormat(Qt.RichText)
         detail_layout.addWidget(self.product_detail)
@@ -137,6 +138,7 @@ class SearchPage(QWidget):
         user_detail_layout.setContentsMargins(22, 18, 22, 18)
 
         self.user_detail = QLabel()
+        self.user_detail.setObjectName("DetailText")
         self.user_detail.setWordWrap(True)
         self.user_detail.setTextFormat(Qt.RichText)
         user_detail_layout.addWidget(self.user_detail)

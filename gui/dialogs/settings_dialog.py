@@ -33,7 +33,7 @@ class SettingsDialog(QDialog):
         subtitle.setObjectName("PageSubtitle")
         layout.addWidget(subtitle)
 
-        self.light_radio = QRadioButton("Light — Cream & Brown")
+        self.light_radio = QRadioButton("Light - Cartify Violet")
         self.dark_radio = QRadioButton("Dark")
 
         self.group = QButtonGroup(self)

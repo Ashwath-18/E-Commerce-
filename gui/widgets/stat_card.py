@@ -14,21 +14,21 @@ class StatCard(QFrame):
         super().__init__(parent)
 
         self.setObjectName("StatCard")
-        self.setMinimumHeight(160)
+        self.setMinimumHeight(156)
 
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(26, 26, 26, 22)
-        layout.setSpacing(8)
+        layout.setContentsMargins(24, 24, 24, 22)
+        layout.setSpacing(7)
 
         # ---------------- Circular Icon Badge ----------------
 
         self.icon_label = QLabel(icon_text)
         self.icon_label.setObjectName("StatIconBadge")
-        self.icon_label.setFixedSize(48, 48)
+        self.icon_label.setFixedSize(46, 46)
         self.icon_label.setAlignment(Qt.AlignCenter)
 
         layout.addWidget(self.icon_label)
-        layout.addSpacing(12)
+        layout.addSpacing(10)
 
         # ---------------- Value ----------------
 

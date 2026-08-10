@@ -1,31 +1,31 @@
 """
-Cartify — Centralized Color Palette (PySide6)
-Pure white / pure black monochrome base with a violet brand accent.
+Cartify - Centralized Color Palette (PySide6).
+Soft neutral surfaces with a violet brand accent.
 """
 
 # -----------------------------
-# LIGHT THEME — Pure White
+# LIGHT THEME
 # -----------------------------
 LIGHT = {
-    "BACKGROUND": "#FFFFFF",
+    "BACKGROUND": "#F8FAFC",
     "SIDEBAR": "#FFFFFF",
     "CARD": "#FFFFFF",
 
-    "PRIMARY": "#5A3DFF",       # violet brand accent
-    "SECONDARY": "#7C6CFF",
-    "ACCENT": "#0A0A0A",
+    "PRIMARY": "#4F46E5",
+    "SECONDARY": "#7C3AED",
+    "ACCENT": "#3730A3",
 
-    "TEXT": "#0A0A0A",
-    "TEXT_LIGHT": "#6B7280",
+    "TEXT": "#111827",
+    "TEXT_LIGHT": "#64748B",
 
-    "BORDER": "#EAEAEA",
+    "BORDER": "#E5E7EB",
 
-    "SIDEBAR_TEXT": "#0A0A0A",
-    "SIDEBAR_TEXT_MUTED": "#8A8A8A",
-    "SIDEBAR_ACTIVE_BG": "#F1EEFF",
-    "SIDEBAR_ACTIVE_TEXT": "#5A3DFF",
+    "SIDEBAR_TEXT": "#111827",
+    "SIDEBAR_TEXT_MUTED": "#6B7280",
+    "SIDEBAR_ACTIVE_BG": "#EEF2FF",
+    "SIDEBAR_ACTIVE_TEXT": "#4F46E5",
 
-    "HOVER": "#F5F5F7",
+    "HOVER": "#F3F4F8",
 
     "SUCCESS": "#16A34A",
     "WARNING": "#F59E0B",
@@ -33,32 +33,32 @@ LIGHT = {
 }
 
 # -----------------------------
-# DARK THEME — Pure Black
+# DARK THEME
 # -----------------------------
 DARK = {
-    "BACKGROUND": "#000000",
-    "SIDEBAR": "#000000",
-    "CARD": "#0B0B0B",
+    "BACKGROUND": "#09090F",
+    "SIDEBAR": "#0D0D16",
+    "CARD": "#0F0F1A",
 
-    "PRIMARY": "#7C6CFF",
-    "SECONDARY": "#9B8FFF",
-    "ACCENT": "#FFFFFF",
+    "PRIMARY": "#A78BFA",
+    "SECONDARY": "#7C3AED",
+    "ACCENT": "#DDD6FE",
 
-    "TEXT": "#FFFFFF",
-    "TEXT_LIGHT": "#BFC4CF",
+    "TEXT": "#F8FAFC",
+    "TEXT_LIGHT": "#A5ADBD",
 
-    "BORDER": "#1E1E1E",
+    "BORDER": "#232335",
 
-    "SIDEBAR_TEXT": "#FFFFFF",
-    "SIDEBAR_TEXT_MUTED": "#7A7A7A",
-    "SIDEBAR_ACTIVE_BG": "#1B1640",
-    "SIDEBAR_ACTIVE_TEXT": "#9B8FFF",
+    "SIDEBAR_TEXT": "#F8FAFC",
+    "SIDEBAR_TEXT_MUTED": "#A5ADBD",
+    "SIDEBAR_ACTIVE_BG": "#211C4D",
+    "SIDEBAR_ACTIVE_TEXT": "#C4B5FD",
 
-    "HOVER": "#111111",
+    "HOVER": "#171727",
 
     "SUCCESS": "#22C55E",
     "WARNING": "#FBBF24",
-    "DANGER": "#F87171",
+    "DANGER": "#EF4444",
 }
 
 CURRENT = LIGHT
@@ -83,6 +83,6 @@ BUTTON_FONT_SIZE = 14
 # -----------------------------
 # Sizes
 # -----------------------------
-SIDEBAR_WIDTH = 270
-CARD_RADIUS = 18
-NAV_BUTTON_HEIGHT = 50
+SIDEBAR_WIDTH = 268
+CARD_RADIUS = 16
+NAV_BUTTON_HEIGHT = 48

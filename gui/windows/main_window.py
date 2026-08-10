@@ -41,7 +41,7 @@ class MainWindow(QMainWindow):
 
         self.setWindowTitle("Cartify")
         self.resize(1500, 850)
-        self.setMinimumSize(1300, 750)
+        self.setMinimumSize(1120, 700)
 
         self.asset_path = os.path.join(
             os.path.dirname(os.path.dirname(__file__)), "assets"
@@ -66,8 +66,8 @@ class MainWindow(QMainWindow):
         # ---------------- Main Column ----------------
 
         main_column = QVBoxLayout()
-        main_column.setContentsMargins(22, 22, 22, 22)
-        main_column.setSpacing(22)
+        main_column.setContentsMargins(24, 22, 24, 22)
+        main_column.setSpacing(20)
 
         self.navbar = Navbar(self.asset_path)
         self.navbar.set_admin_name(admin_name)
@@ -130,23 +130,24 @@ class MainWindow(QMainWindow):
         # Keep branding (logo) and shadows in sync with the new theme
         self.navbar.set_theme(theme)
         self.sidebar.set_theme(theme)
+        self.settings_page.set_theme(theme)
         self._apply_shadows()
 
     def _apply_shadows(self):
         """
-        Light theme -> subtle black shadow.
-        Dark theme  -> subtle white glow (black shadow is invisible
-        on a pure black background).
+        Light theme -> subtle neutral shadow.
+        Dark theme  -> restrained violet shadow that remains visible
+        on dark surfaces.
         """
         is_dark = self.current_theme == "dark"
-        shadow_color = QColor(255, 255, 255, 18) if is_dark else QColor(0, 0, 0, 35)
+        shadow_color = QColor(130, 110, 255, 24) if is_dark else QColor(15, 23, 42, 28)
 
         for frame in self.findChildren(QFrame):
             if frame.objectName() in SHADOW_OBJECT_NAMES:
                 effect = QGraphicsDropShadowEffect(frame)
-                effect.setBlurRadius(24)
+                effect.setBlurRadius(28)
                 effect.setXOffset(0)
-                effect.setYOffset(6 if not is_dark else 0)
+                effect.setYOffset(8 if not is_dark else 0)
                 effect.setColor(shadow_color)
                 frame.setGraphicsEffect(effect)
 

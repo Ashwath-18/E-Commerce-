@@ -37,6 +37,7 @@ class AIAssistantPage(QWidget):
         chat_layout.setContentsMargins(16, 16, 16, 16)
 
         self.chat_log = QTextEdit()
+        self.chat_log.setObjectName("DetailText")
         self.chat_log.setReadOnly(True)
         self.chat_log.setPlaceholderText("Conversation will appear here...")
         chat_layout.addWidget(self.chat_log, stretch=1)

@@ -40,10 +40,10 @@ class Sidebar(QWidget):
         self.active_page = "dashboard"
 
         self.setObjectName("Sidebar")
-        self.setFixedWidth(270)
+        self.setFixedWidth(268)
 
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(0, 26, 0, 0)
+        layout.setContentsMargins(0, 28, 0, 0)
         layout.setSpacing(0)
 
         # ---------------- Logo ----------------
@@ -74,8 +74,8 @@ class Sidebar(QWidget):
 
         nav_container = QWidget()
         nav_layout = QVBoxLayout(nav_container)
-        nav_layout.setContentsMargins(14, 6, 14, 10)
-        nav_layout.setSpacing(4)
+        nav_layout.setContentsMargins(16, 8, 16, 12)
+        nav_layout.setSpacing(6)
 
         dashboard_btn = self._create_nav_button("Dashboard", "dashboard.png")
         dashboard_btn.clicked.connect(lambda: self.select("dashboard"))
@@ -100,10 +100,10 @@ class Sidebar(QWidget):
         self.select("dashboard")
 
     def _create_nav_button(self, text, icon_file):
-        btn = QPushButton("   " + text)
+        btn = QPushButton("  " + text)
         btn.setObjectName("NavButton")
         btn.setCheckable(True)
-        btn.setFixedHeight(50)
+        btn.setFixedHeight(48)
         btn.setCursor(Qt.PointingHandCursor)
 
         icon_path = os.path.join(self.asset_path, icon_file)
@@ -126,17 +126,21 @@ class Sidebar(QWidget):
         self._load_logo()
 
     def _load_logo(self):
-        filename = "logo_dark.png" if self.current_theme == "dark" else "logo_light.png"
-        logo_path = os.path.join(self.asset_path, filename)
+        preferred = "logo_dark.png" if self.current_theme == "dark" else "logo_light.png"
+        fallback_names = [preferred, "logo_light.png", "logo.png"]
+        logo_path = next(
+            (
+                os.path.join(self.asset_path, name)
+                for name in fallback_names
+                if os.path.exists(os.path.join(self.asset_path, name))
+            ),
+            None,
+        )
 
-        if not os.path.exists(logo_path):
-            logo_path = os.path.join(self.asset_path, "logo.png")
-
-        if os.path.exists(logo_path):
+        if logo_path:
             pixmap = QPixmap(logo_path).scaled(
-                88, 88, Qt.KeepAspectRatio, Qt.SmoothTransformation
+                84, 84, Qt.KeepAspectRatio, Qt.SmoothTransformation
             )
             self.logo_label.setPixmap(pixmap)
         else:
-
             self.logo_label.clear()

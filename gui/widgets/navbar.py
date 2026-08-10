@@ -22,10 +22,11 @@ class Navbar(QWidget):
         self.current_theme = "light"
 
         self.setObjectName("Navbar")
-        self.setFixedHeight(90)
+        self.setFixedHeight(86)
 
         layout = QHBoxLayout(self)
-        layout.setContentsMargins(24, 10, 26, 10)
+        layout.setContentsMargins(24, 10, 24, 10)
+        layout.setSpacing(0)
 
         # ---------------- Logo ----------------
 
@@ -46,7 +47,7 @@ class Navbar(QWidget):
         title_block.addWidget(title)
         title_block.addWidget(subtitle)
 
-        layout.addSpacing(12)
+        layout.addSpacing(14)
         layout.addLayout(title_block)
 
         layout.addStretch()
@@ -77,17 +78,20 @@ class Navbar(QWidget):
         self._load_logo()
 
     def _load_logo(self):
-        filename = "logo_dark.png" if self.current_theme == "dark" else "logo_light.png"
-        logo_path = os.path.join(self.asset_path, filename)
+        preferred = "logo_dark.png" if self.current_theme == "dark" else "logo_light.png"
+        fallback_names = [preferred, "logo_light.png", "logo.png"]
+        logo_path = next(
+            (
+                os.path.join(self.asset_path, name)
+                for name in fallback_names
+                if os.path.exists(os.path.join(self.asset_path, name))
+            ),
+            None,
+        )
 
-        # Falls back to the original logo.png if the themed
-        # asset hasn't been added to gui/assets yet.
-        if not os.path.exists(logo_path):
-            logo_path = os.path.join(self.asset_path, "logo.png")
-
-        if os.path.exists(logo_path):
+        if logo_path:
             pixmap = QPixmap(logo_path).scaled(
-                58, 58, Qt.KeepAspectRatio, Qt.SmoothTransformation
+                56, 56, Qt.KeepAspectRatio, Qt.SmoothTransformation
             )
             self.logo_label.setPixmap(pixmap)
         else:

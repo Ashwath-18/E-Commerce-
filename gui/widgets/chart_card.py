@@ -39,9 +39,9 @@ class _BarChart(QWidget):
         width = self.width()
         height = self.height()
 
-        padding_bottom = 40
-        padding_top = 20
-        padding_side = 20
+        padding_bottom = 42
+        padding_top = 22
+        padding_side = 24
 
         chart_h = height - padding_bottom - padding_top
         chart_w = width - (padding_side * 2)
@@ -50,7 +50,7 @@ class _BarChart(QWidget):
         max_value = max(max_value, 1)
 
         bar_count = len(self.data)
-        gap = 24
+        gap = 26
         bar_width = max(
             (chart_w - gap * (bar_count - 1)) / bar_count, 20
         ) if bar_count else 20
@@ -97,7 +97,7 @@ class ChartCard(QFrame):
         layout.setSpacing(12)
 
         self.title_label = QLabel(title)
-        self.title_label.setObjectName("PageSubtitle")
+        self.title_label.setObjectName("ChartTitle")
         layout.addWidget(self.title_label)
 
         self.chart = _BarChart(data)

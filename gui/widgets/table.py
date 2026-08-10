@@ -27,13 +27,21 @@ class DataTable(QTableWidget):
         self.setEditTriggers(QAbstractItemView.NoEditTriggers)
         self.setSelectionBehavior(QAbstractItemView.SelectRows)
         self.setSelectionMode(QAbstractItemView.SingleSelection)
-        self.setAlternatingRowColors(False)
+        self.setAlternatingRowColors(True)
         self.verticalHeader().setVisible(False)
         self.setShowGrid(True)
+        self.setMouseTracking(True)
+        self.setWordWrap(False)
+        self.setTextElideMode(Qt.ElideRight)
+        self.setHorizontalScrollMode(QAbstractItemView.ScrollPerPixel)
+        self.setVerticalScrollMode(QAbstractItemView.ScrollPerPixel)
 
         header = self.horizontalHeader()
         header.setSectionResizeMode(QHeaderView.Stretch)
         header.setDefaultAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+        header.setMinimumHeight(44)
+
+        self.verticalHeader().setDefaultSectionSize(42)
 
         self.itemSelectionChanged.connect(self._on_selection_changed)
 
@@ -49,6 +57,7 @@ class DataTable(QTableWidget):
                 value = row.get(key, "")
                 item = QTableWidgetItem(str(value))
                 item.setFlags(item.flags() & ~Qt.ItemIsEditable)
+                item.setTextAlignment(Qt.AlignLeft | Qt.AlignVCenter)
                 self.setItem(row_index, col_index, item)
 
     def get_selected_row(self):
