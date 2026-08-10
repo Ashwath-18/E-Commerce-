@@ -2,18 +2,18 @@ from config.mongodb import db
 
 def create_collections():
     collections = [
-        "users",
-        "products",
-        "sellers",
-        "categories",
-        "subcategories",
-        "orders",
-        "payments",
-        "shipping",
-        "reviews",
-        "inventory",
-        "returns",
-        "orderitems"
+        "Users",
+        "Products",
+        "Sellers",
+        "Categories",
+        "SubCategories",
+        "Orders",
+        "Payments",
+        "Shipping",
+        "Reviews",
+        "Inventory",
+        "Returns",
+        "OrderItems"
     ]
 
     for collection in collections:
@@ -26,4 +26,4 @@ def create_collections():
     print("\n All collections are ready.")
 
 if __name__ == "__main__":
-    create_collections()
+    create_collections()    

@@ -3,6 +3,8 @@ Order Model
 Represents an Order document in MongoDB
 """
 
+import uuid
+
 
 class Order:
     def __init__(
@@ -17,6 +19,7 @@ class Order:
         delivery_status,
         is_returned
     ):
+        self.order_id = str(uuid.uuid4())
         self.user_id = user_id
         self.product_id = product_id
         self.purchase_date = purchase_date
@@ -29,6 +32,7 @@ class Order:
 
     def to_dict(self):
         return {
+            "order_id": self.order_id,
             "user_id": self.user_id,
             "product_id": self.product_id,
             "purchase_date": self.purchase_date,
@@ -42,7 +46,7 @@ class Order:
 
     def __str__(self):
         return (
-            f"Order(User: {self.user_id}, "
+            f"Order({self.order_id}, User: {self.user_id}, "
             f"Product: {self.product_id}, "
             f"Status: {self.delivery_status})"
         )
