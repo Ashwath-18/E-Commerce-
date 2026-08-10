@@ -5,10 +5,12 @@ yet, so this queries the collection directly via config.mongodb.
 """
 
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QLabel, QFrame
+from gui.widgets.search_bar import SearchBar
 from gui.widgets.table import DataTable
 from gui.widgets.notification import show_notification
 
 from config.mongodb import db
+from search.search_products import search_shipping
 
 DISPLAY_LIMIT = 300
 
@@ -38,6 +40,12 @@ class ShippingPage(QWidget):
         layout.addWidget(title)
         layout.addWidget(subtitle)
 
+        self.search_bar = SearchBar(
+            placeholder="Search user, product, location, or status..."
+        )
+        self.search_bar.search_triggered.connect(self._search)
+        layout.addWidget(self.search_bar)
+
         table_card = QFrame()
         table_card.setObjectName("Card")
         table_layout = QVBoxLayout(table_card)
@@ -58,6 +66,19 @@ class ShippingPage(QWidget):
             self.table.load_data(records)
         except Exception as e:
             show_notification(self, f"Could not load shipping data: {e}", "error")
+
+    def _search(self, query):
+        if not query:
+            self.load_shipping()
+            return
+
+        try:
+            records = search_shipping(query)
+            self.table.load_data(records[:DISPLAY_LIMIT])
+            if not records:
+                show_notification(self, "No shipping records found.", "warning")
+        except Exception as e:
+            show_notification(self, f"Search failed: {e}", "error")
 
     def showEvent(self, event):
         super().showEvent(event)

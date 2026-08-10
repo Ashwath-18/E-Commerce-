@@ -19,7 +19,6 @@ from gui.styles import apply_theme
 
 from gui.pages.dashboard_page import DashboardPage
 from gui.pages.products_page import ProductsPage
-from gui.pages.database_page import DatabasePage
 from gui.pages.orders_page import OrdersPage
 from gui.pages.shipping_page import ShippingPage
 from gui.pages.users_page import UsersPage
@@ -87,7 +86,6 @@ class MainWindow(QMainWindow):
 
         self.dashboard_page = DashboardPage()
         self.products_page = ProductsPage()
-        self.database_page = DatabasePage()
         self.orders_page = OrdersPage()
         self.shipping_page = ShippingPage()
         self.users_page = UsersPage()
@@ -102,7 +100,6 @@ class MainWindow(QMainWindow):
         page_map = {
             "dashboard": self.dashboard_page,
             "products": self.products_page,
-            "database": self.database_page,
             "orders": self.orders_page,
             "shipping": self.shipping_page,
             "users": self.users_page,

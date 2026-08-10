@@ -8,6 +8,7 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtCore import Qt
 
+from gui.widgets.search_bar import SearchBar
 from gui.widgets.table import DataTable
 from gui.widgets.notification import show_notification
 from gui.dialogs.add_user_dialog import AddUserDialog
@@ -15,6 +16,7 @@ from gui.dialogs.delete_dialog import confirm_delete
 
 from crud.read import get_all_users
 from crud.delete import delete_user
+from search.search_products import search_users_by_id
 
 DISPLAY_LIMIT = 300
 
@@ -55,6 +57,10 @@ class UsersPage(QWidget):
         header_row.addWidget(add_btn)
         layout.addLayout(header_row)
 
+        self.search_bar = SearchBar(placeholder="Search by User ID...")
+        self.search_bar.search_triggered.connect(self._search)
+        layout.addWidget(self.search_bar)
+
         table_card = QFrame()
         table_card.setObjectName("Card")
         table_layout = QVBoxLayout(table_card)
@@ -88,6 +94,19 @@ class UsersPage(QWidget):
 
     def _on_row_selected(self, row):
         self.selected_user = row
+
+    def _search(self, user_id):
+        if not user_id:
+            self.load_users()
+            return
+
+        try:
+            results = search_users_by_id(user_id)
+            self.table.load_data(results[:DISPLAY_LIMIT])
+            if not results:
+                show_notification(self, "No users found.", "warning")
+        except Exception as e:
+            show_notification(self, f"Search failed: {e}", "error")
 
     def _add_user(self):
         dialog = AddUserDialog(self)

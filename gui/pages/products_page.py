@@ -19,7 +19,7 @@ from gui.dialogs.delete_dialog import confirm_delete
 
 from crud.read import get_all_products
 from crud.delete import delete_product
-from search.search_products import search_products_by_brand
+from search.search_products import search_products
 
 DISPLAY_LIMIT = 300
 
@@ -71,7 +71,9 @@ class ProductsPage(QWidget):
 
         # ---------------- Search Bar ----------------
 
-        self.search_bar = SearchBar(placeholder="Search by brand...")
+        self.search_bar = SearchBar(
+            placeholder="Search by product ID, brand, category, or subcategory..."
+        )
         self.search_bar.search_triggered.connect(self._search)
         layout.addWidget(self.search_bar)
 
@@ -119,16 +121,16 @@ class ProductsPage(QWidget):
         except Exception as e:
             show_notification(self, f"Could not load products: {e}", "error")
 
-    def _search(self, brand):
-        if not brand:
+    def _search(self, query):
+        if not query:
             self.load_products()
             return
 
         try:
-            results = search_products_by_brand(brand)
+            results = search_products(query)
             self.table.load_data(results[:DISPLAY_LIMIT])
             if not results:
-                show_notification(self, "No products found for that brand.", "warning")
+                show_notification(self, "No matching products found.", "warning")
         except Exception as e:
             show_notification(self, f"Search failed: {e}", "error")
 

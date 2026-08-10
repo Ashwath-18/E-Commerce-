@@ -21,7 +21,6 @@ class Sidebar(QWidget):
 
     NAV_ITEMS = [
         ("products", "Products", "products.png"),
-        ("database", "Database", "database.png"),
         ("orders", "Orders", "orders.png"),
         ("shipping", "Shipping", "shipping.png"),
         ("users", "Users", "users.png"),
@@ -139,4 +138,5 @@ class Sidebar(QWidget):
             )
             self.logo_label.setPixmap(pixmap)
         else:
+
             self.logo_label.clear()
