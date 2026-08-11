@@ -59,6 +59,21 @@ class AddProductDialog(QDialog):
         self.review_count_input = QSpinBox()
         self.review_count_input.setMaximum(1_000_000)
 
+        form_fields = (
+            self.product_id_input,
+            self.category_input,
+            self.subcategory_input,
+            self.brand_input,
+            self.price_input,
+            self.discount_input,
+            self.final_price_input,
+            self.stock_input,
+            self.rating_input,
+            self.review_count_input,
+        )
+        for field in form_fields:
+            field.setMinimumHeight(48)
+
         form.addRow("Product ID *", self.product_id_input)
         form.addRow("Category *", self.category_input)
         form.addRow("Subcategory", self.subcategory_input)

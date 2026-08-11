@@ -254,9 +254,42 @@ QPushButton#DangerButton:pressed {
     padding-bottom: 9px;
 }
 
+QToolButton#SortButton {
+    background-color: #111120;
+    border: 1px solid #303044;
+    border-radius: 12px;
+    padding: 7px;
+}
+
+QToolButton#SortButton:hover {
+    background-color: #1B1B33;
+    border: 1px solid #7C6CFF;
+}
+
+QToolButton#SortButton:pressed {
+    background-color: #26234B;
+}
+
+QMenu {
+    background-color: #151524;
+    border: 1px solid #303044;
+    border-radius: 8px;
+    padding: 6px;
+}
+
+QMenu::item {
+    padding: 8px 28px 8px 12px;
+    border-radius: 6px;
+}
+
+QMenu::item:selected {
+    background-color: #26234B;
+    color: #C4B5FD;
+}
+
 /* ---------------- Inputs ---------------- */
 
-QLineEdit, QComboBox, QDoubleSpinBox, QSpinBox, QTextEdit {
+QLineEdit, QComboBox, QDateEdit, QDoubleSpinBox, QSpinBox, QTextEdit {
     background-color: #111120;
     border: 1px solid #303044;
     border-radius: 10px;
@@ -266,13 +299,111 @@ QLineEdit, QComboBox, QDoubleSpinBox, QSpinBox, QTextEdit {
     selection-color: #FFFFFF;
 }
 
-QLineEdit:hover, QComboBox:hover, QDoubleSpinBox:hover, QSpinBox:hover, QTextEdit:hover {
+QLineEdit:hover, QComboBox:hover, QDateEdit:hover, QDoubleSpinBox:hover, QSpinBox:hover, QTextEdit:hover {
     border: 1px solid #5B4CB8;
 }
 
-QLineEdit:focus, QComboBox:focus, QDoubleSpinBox:focus, QSpinBox:focus, QTextEdit:focus {
+QLineEdit:focus, QComboBox:focus, QDateEdit:focus, QDoubleSpinBox:focus, QSpinBox:focus, QTextEdit:focus {
     border: 1px solid #A78BFA;
     background-color: #131326;
+}
+
+/* Keep numeric form fields spacious so their values never sit beneath arrows. */
+QDateEdit, QDoubleSpinBox, QSpinBox {
+    min-height: 34px;
+    padding: 0 42px 0 14px;
+}
+
+QDateEdit::drop-down,
+QDoubleSpinBox::up-button, QSpinBox::up-button,
+QDoubleSpinBox::down-button, QSpinBox::down-button {
+    subcontrol-origin: border;
+    width: 28px;
+    background-color: #171727;
+    border-left: 1px solid #303044;
+}
+
+QDoubleSpinBox::up-button, QSpinBox::up-button {
+    subcontrol-position: top right;
+    border-top-right-radius: 9px;
+}
+
+QDoubleSpinBox::down-button, QSpinBox::down-button {
+    subcontrol-position: bottom right;
+    border-bottom-right-radius: 9px;
+}
+
+QDateEdit::drop-down {
+    subcontrol-position: center right;
+    border-top-right-radius: 9px;
+    border-bottom-right-radius: 9px;
+}
+
+QDateEdit::down-arrow {
+    image: url(gui/assets/calendar_dark.svg);
+    width: 20px;
+    height: 20px;
+}
+
+/* ---------------- Calendar Popup ---------------- */
+
+QCalendarWidget QWidget {
+    background-color: #151524;
+    color: #F8FAFC;
+}
+
+QCalendarWidget QToolButton {
+    color: #DDD6FE;
+    background-color: #26234B;
+    border: 1px solid #5B4CB8;
+    border-radius: 8px;
+    padding: 6px 10px;
+    font-weight: 700;
+}
+
+QCalendarWidget QToolButton:hover {
+    background-color: #312E5B;
+    border-color: #A78BFA;
+}
+
+QCalendarWidget QSpinBox {
+    color: #F8FAFC;
+    background-color: #1B1B33;
+    border: 1px solid #5B4CB8;
+    border-radius: 7px;
+    min-width: 92px;
+    padding: 2px 28px 2px 8px;
+    font-weight: 700;
+}
+
+QCalendarWidget QAbstractItemView:enabled {
+    background-color: #151524;
+    color: #F8FAFC;
+    selection-background-color: #7C3AED;
+    selection-color: #FFFFFF;
+    outline: 0;
+}
+
+QCalendarWidget QAbstractItemView:disabled {
+    color: #6B7280;
+}
+
+QCalendarWidget QHeaderView::section {
+    background-color: #26234B;
+    color: #DDD6FE;
+    border: none;
+    padding: 6px;
+    font-weight: 700;
+}
+
+/* Keep weekday names readable even after the global table-header rules. */
+QCalendarWidget QTableView QHeaderView::section,
+QCalendarWidget QHeaderView::section {
+    background-color: #26234B;
+    color: #DDD6FE;
+    border: 1px solid #3C3870;
+    padding: 6px;
+    font-weight: 700;
 }
 
 #SearchBarContainer {
@@ -456,4 +587,14 @@ QToolTip {
     border: none;
     padding: 6px;
     border-radius: 6px;
+}
+
+/* Final calendar-header override: protects weekday contrast from table styles. */
+QCalendarWidget QTableView QHeaderView::section,
+QCalendarWidget QHeaderView::section {
+    background-color: #26234B;
+    color: #DDD6FE;
+    border: 1px solid #3C3870;
+    padding: 6px;
+    font-weight: 700;
 }

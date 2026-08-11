@@ -1,6 +1,6 @@
 """Dashboard Page with live Cartify database statistics."""
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
     QGridLayout,
     QHBoxLayout,
@@ -26,9 +26,19 @@ COLLECTIONS = [
     ("Sellers", "V"),
 ]
 
+CARD_PAGES = {
+    "Products": "products",
+    "Users": "users",
+    "Orders": "orders",
+    "Reviews": "reviews",
+    "Shipping": "shipping",
+}
+
 
 class DashboardPage(QWidget):
     """Show live MongoDB collection counts."""
+
+    page_requested = Signal(str)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -65,6 +75,14 @@ class DashboardPage(QWidget):
 
         for index, (collection_name, icon_text) in enumerate(COLLECTIONS):
             card = StatCard(icon_text, collection_name, "—")
+            page_key = CARD_PAGES.get(collection_name)
+            if page_key:
+                card.set_clickable(True, f"Open {collection_name}")
+                card.clicked.connect(
+                    lambda page=page_key: self.page_requested.emit(page)
+                )
+            else:
+                card.set_clickable(False)
             stats_grid.addWidget(card, index // 4, index % 4)
             self.cards[collection_name] = card
 

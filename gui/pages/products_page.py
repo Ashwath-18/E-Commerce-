@@ -10,18 +10,26 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Qt
 
 from gui.widgets.search_bar import SearchBar
+from gui.widgets.sort_button import SortButton
 from gui.widgets.table import DataTable
 from gui.widgets.notification import show_notification
+from gui.widgets.pagination import PaginationControls
 
 from gui.dialogs.add_product_dialog import AddProductDialog
 from gui.dialogs.edit_product_dialog import EditProductDialog
 from gui.dialogs.delete_dialog import confirm_delete
 
-from crud.read import get_all_products
 from crud.delete import delete_product
-from search.search_products import search_products
+from search.search_products import get_products_page
 
-DISPLAY_LIMIT = 300
+PAGE_SIZE = 100
+
+SORT_OPTIONS = [
+    ("product_id", "Product ID", "text"),
+    ("final_price", "Price", "number"),
+    ("stock", "Stock", "number"),
+    ("rating", "Rating", "number"),
+]
 
 COLUMNS = [
     ("product_id", "Product ID"),
@@ -40,6 +48,8 @@ class ProductsPage(QWidget):
         super().__init__(parent)
 
         self.selected_product = None
+        self.current_query = ""
+        self.current_page = 1
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
@@ -75,7 +85,16 @@ class ProductsPage(QWidget):
             placeholder="Search by product ID, brand, category, or subcategory..."
         )
         self.search_bar.search_triggered.connect(self._search)
-        layout.addWidget(self.search_bar)
+        self.search_bar.setMaximumWidth(780)
+
+        self.sort_button = SortButton(SORT_OPTIONS)
+        self.sort_button.sort_requested.connect(self._sort)
+
+        search_row = QHBoxLayout()
+        search_row.addWidget(self.search_bar)
+        search_row.addWidget(self.sort_button)
+        search_row.addStretch()
+        layout.addLayout(search_row)
 
         # ---------------- Table Card ----------------
 
@@ -89,6 +108,10 @@ class ProductsPage(QWidget):
         table_layout.addWidget(self.table)
 
         layout.addWidget(table_card, stretch=1)
+
+        self.pagination = PaginationControls(PAGE_SIZE)
+        self.pagination.page_changed.connect(self.load_products)
+        layout.addWidget(self.pagination)
 
         # ---------------- Action Row ----------------
 
@@ -114,28 +137,35 @@ class ProductsPage(QWidget):
 
     # ---------------- Data Loading ----------------
 
-    def load_products(self):
+    def load_products(self, page=1):
         try:
-            products = get_all_products()
-            self.table.load_data(products[:DISPLAY_LIMIT])
+            products, total = get_products_page(
+                page, PAGE_SIZE, self.current_query
+            )
+            self.current_page = page
+            self.table.load_data(products)
+            self.pagination.set_pagination(total, page)
         except Exception as e:
             show_notification(self, f"Could not load products: {e}", "error")
 
     def _search(self, query):
         if not query:
-            self.load_products()
+            self.current_query = ""
+            self.load_products(1)
             return
 
         try:
-            results = search_products(query)
-            self.table.load_data(results[:DISPLAY_LIMIT])
-            if not results:
-                show_notification(self, "No matching products found.", "warning")
+            self.current_query = query
+            self.load_products(1)
         except Exception as e:
             show_notification(self, f"Search failed: {e}", "error")
 
     def _on_row_selected(self, row):
         self.selected_product = row
+
+    def _sort(self, field, descending):
+        numeric = field in {"final_price", "stock", "rating"}
+        self.table.sort_data(field, descending, numeric)
 
     # ---------------- Actions ----------------
 
@@ -143,7 +173,7 @@ class ProductsPage(QWidget):
         dialog = AddProductDialog(self)
         if dialog.exec():
             show_notification(self, "Product added successfully.", "success")
-            self.load_products()
+            self.load_products(self.current_page)
 
     def _edit_product(self):
         if not self.selected_product:
@@ -153,7 +183,7 @@ class ProductsPage(QWidget):
         dialog = EditProductDialog(self.selected_product, self)
         if dialog.exec():
             show_notification(self, "Product updated.", "success")
-            self.load_products()
+            self.load_products(self.current_page)
 
     def _delete_product(self):
         if not self.selected_product:
@@ -167,10 +197,10 @@ class ProductsPage(QWidget):
                 delete_product(product_id)
                 show_notification(self, "Product deleted.", "success")
                 self.selected_product = None
-                self.load_products()
+                self.load_products(self.current_page)
             except Exception as e:
                 show_notification(self, f"Delete failed: {e}", "error")
 
     def showEvent(self, event):
         super().showEvent(event)
-        self.load_products()
+        self.load_products(self.current_page)

@@ -16,6 +16,8 @@ from html import escape
 
 from gui.widgets.table import DataTable
 from gui.widgets.notification import show_notification
+from gui.widgets.sort_button import SortButton
+from gui.widgets.pagination import PaginationControls
 
 from search.search_products import (
     search_product_by_id,
@@ -27,6 +29,7 @@ from search.search_products import (
     search_sellers_by_rating,
     get_product_overview,
     get_user_overview,
+    get_search_results_page,
 )
 from search.filter_products import (
     filter_products_in_stock,
@@ -49,6 +52,13 @@ SELLER_COLUMNS = [
     ("seller_id", "Seller ID"), ("seller_rating", "Rating"),
 ]
 
+NUMERIC_FIELDS = {
+    "final_price", "stock", "rating", "review_count", "seller_rating",
+}
+
+DATE_FIELDS = {"purchase_date"}
+PAGE_SIZE = 100
+
 MODES = {
     "Product by ID": ("input", PRODUCT_COLUMNS),
     "Products by Brand": ("input", PRODUCT_COLUMNS),
@@ -57,10 +67,6 @@ MODES = {
     "Products by Min Rating": ("input", PRODUCT_COLUMNS),
     "User by ID": ("input", ORDER_COLUMNS),
     "Orders by User ID": ("input", ORDER_COLUMNS),
-    "Sellers by Min Rating": ("input", SELLER_COLUMNS),
-    "In-Stock Products": ("none", PRODUCT_COLUMNS),
-    "Returned Orders": ("none", ORDER_COLUMNS),
-    "Delivered Orders": ("none", ORDER_COLUMNS),
 }
 
 
@@ -100,9 +106,13 @@ class SearchPage(QWidget):
         self.mode_dropdown = QComboBox()
         self.mode_dropdown.addItems(list(MODES.keys()))
         self.mode_dropdown.currentTextChanged.connect(self._on_mode_changed)
+        self.current_mode = self.mode_dropdown.currentText()
+        self.current_query = ""
+        self.current_page = 1
 
         self.query_input = QLineEdit()
         self.query_input.setPlaceholderText("Enter search value...")
+        self.query_input.setMaximumWidth(600)
         self.query_input.returnPressed.connect(self._run_search)
 
         search_btn = QPushButton("Search")
@@ -110,9 +120,14 @@ class SearchPage(QWidget):
         search_btn.setCursor(Qt.PointingHandCursor)
         search_btn.clicked.connect(self._run_search)
 
+        self.sort_button = SortButton()
+        self.sort_button.sort_requested.connect(self._sort)
+
         controls_row.addWidget(self.mode_dropdown)
-        controls_row.addWidget(self.query_input, stretch=1)
+        controls_row.addWidget(self.query_input)
         controls_row.addWidget(search_btn)
+        controls_row.addWidget(self.sort_button)
+        controls_row.addStretch()
 
         layout.addLayout(controls_row)
 
@@ -159,18 +174,27 @@ class SearchPage(QWidget):
 
         layout.addWidget(table_card, stretch=1)
 
+        self.pagination = PaginationControls(PAGE_SIZE)
+        self.pagination.page_changed.connect(self._load_results)
+        layout.addWidget(self.pagination)
+
         self._on_mode_changed(self.mode_dropdown.currentText())
 
     def _on_mode_changed(self, mode):
         input_type, columns = MODES[mode]
         self.query_input.setEnabled(input_type == "input")
         self.query_input.clear()
+        self.current_mode = mode
+        self.current_query = ""
+        self.current_page = 1
         self.product_detail_card.hide()
         self.user_detail_card.hide()
         self.table.columns = columns
         self.table.setColumnCount(len(columns))
         self.table.setHorizontalHeaderLabels([label for _, label in columns])
         self.table.load_data([])
+        self._set_sort_options(columns)
+        self.pagination.set_pagination(0, 1)
 
     def _run_search(self):
         mode = self.mode_dropdown.currentText()
@@ -181,26 +205,39 @@ class SearchPage(QWidget):
             show_notification(self, "Enter a search value first.", "warning")
             return
 
+        self.current_mode = mode
+        self.current_query = query
+        self._load_results(1)
+
+    def _load_results(self, page=1):
+        """Load one results page while preserving the active search mode."""
         try:
             self.product_detail_card.hide()
             self.user_detail_card.hide()
 
-            if mode == "Product by ID":
-                overview = get_product_overview(query)
+            if self.current_mode == "Product by ID":
+                overview = get_product_overview(self.current_query)
                 results = [overview["product"]] if overview else []
+                total = len(results)
                 if overview:
                     self._show_product_overview(overview)
-            elif mode == "User by ID":
-                overview = get_user_overview(query)
-                results = overview["orders"] if overview else []
+            elif self.current_mode == "User by ID":
+                overview = get_user_overview(self.current_query)
                 if overview:
                     self._show_user_overview(overview)
+                results, total = get_search_results_page(
+                    self.current_mode, self.current_query, page, PAGE_SIZE
+                )
             else:
-                results = self._execute(mode, query)
+                results, total = get_search_results_page(
+                    self.current_mode, self.current_query, page, PAGE_SIZE
+                )
 
+            self.current_page = page
             self.table.load_data(results)
+            self.pagination.set_pagination(total, page)
 
-            if not results:
+            if not results and page == 1:
                 show_notification(self, "No results found.", "warning")
         except Exception as e:
             show_notification(self, f"Search failed: {e}", "error")
@@ -219,29 +256,39 @@ class SearchPage(QWidget):
 
         self.product_detail.setText(
             "<h3 style='margin:0 0 10px 0;'>Product Details</h3>"
-            "<table cellspacing='6'>"
+            "<table width='100%' cellspacing='20' cellpadding='3'>"
             f"<tr><td><b>Product ID</b></td><td>{value('product_id')}</td>"
+            "<td width='18%'></td>"
             f"<td><b>Brand</b></td><td>{value('brand')}</td></tr>"
             f"<tr><td><b>Category</b></td><td>{value('category')}</td>"
+            "<td width='18%'></td>"
             f"<td><b>Subcategory</b></td><td>{value('subcategory')}</td></tr>"
             f"<tr><td><b>Original Price</b></td><td>{value('price')}</td>"
+            "<td width='18%'></td>"
             f"<td><b>Discount</b></td><td>{value('discount')}%</td></tr>"
             f"<tr><td><b>Final Price</b></td><td>{value('final_price')}</td>"
+            "<td width='18%'></td>"
             f"<td><b>Product Stock</b></td><td>{value('stock')}</td></tr>"
             f"<tr><td><b>Product Rating</b></td><td>{value('rating')}</td>"
+            "<td width='18%'></td>"
             f"<td><b>Listed Review Count</b></td><td>{value('review_count')}</td></tr>"
             "</table>"
             "<h3 style='margin:12px 0 10px 0;'>Related Records</h3>"
-            "<table cellspacing='6'>"
+            "<table width='100%' cellspacing='20' cellpadding='3'>"
             f"<tr><td><b>Inventory Stock</b></td><td>{overview['inventory_stock']}</td>"
+            "<td width='18%'></td>"
             f"<td><b>Orders</b></td><td>{overview['order_count']}</td></tr>"
             f"<tr><td><b>Review Records</b></td><td>{overview['review_records']}</td>"
+            "<td width='18%'></td>"
             f"<td><b>Average Review Rating</b></td><td>{average_rating}</td></tr>"
             f"<tr><td><b>Shipping Records</b></td><td>{overview['shipping_count']}</td>"
+            "<td width='18%'></td>"
             f"<td><b>Delivery Statuses</b></td><td>{escape(statuses)}</td></tr>"
             f"<tr><td><b>Payment Records</b></td><td>{overview['payment_count']}</td>"
+            "<td width='18%'></td>"
             f"<td><b>Payment Methods</b></td><td>{escape(payment_methods)}</td></tr>"
             f"<tr><td><b>Returned Orders</b></td><td>{overview['return_count']}</td>"
+            "<td width='18%'></td>"
             f"<td><b>Order Items</b></td><td>{overview['order_item_count']}</td></tr>"
             "</table>"
         )
@@ -255,43 +302,40 @@ class SearchPage(QWidget):
 
         self.user_detail.setText(
             "<h3 style='margin:0 0 10px 0;'>User Details</h3>"
-            "<table cellspacing='6'>"
+            "<table width='100%' cellspacing='20' cellpadding='3'>"
             f"<tr><td><b>User ID</b></td><td>{user_id}</td>"
+            "<td width='18%'></td>"
             f"<td><b>Total Orders</b></td><td>{len(overview['orders'])}</td></tr>"
             f"<tr><td><b>Unique Products Purchased</b></td><td>{overview['unique_products']}</td>"
+            "<td width='18%'></td>"
             f"<td><b>Order Items</b></td><td>{overview['order_item_count']}</td></tr>"
             "</table>"
             "<h3 style='margin:12px 0 10px 0;'>Related Records</h3>"
-            "<table cellspacing='6'>"
+            "<table width='100%' cellspacing='20' cellpadding='3'>"
             f"<tr><td><b>Shipping Records</b></td><td>{overview['shipping_count']}</td>"
+            "<td width='18%'></td>"
             f"<td><b>Delivery Statuses</b></td><td>{escape(statuses)}</td></tr>"
             f"<tr><td><b>Payment Records</b></td><td>{overview['payment_count']}</td>"
+            "<td width='18%'></td>"
             f"<td><b>Payment Methods</b></td><td>{escape(payment_methods)}</td></tr>"
             f"<tr><td><b>Returned Orders</b></td><td>{overview['return_count']}</td>"
+            "<td width='18%'></td>"
             "<td><b>Order List</b></td><td>Shown below</td></tr>"
             "</table>"
         )
         self.user_detail_card.show()
 
-    def _execute(self, mode, query):
-        if mode == "Product by ID":
-            return search_product_by_id(query)
-        if mode == "Products by Brand":
-            return search_products_by_brand(query)
-        if mode == "Products by Category":
-            return search_products_by_category(query)
-        if mode == "Products by Subcategory":
-            return search_products_by_subcategory(query)
-        if mode == "Products by Min Rating":
-            return search_products_by_rating(float(query))
-        if mode == "Orders by User ID":
-            return search_orders_by_user(query)
-        if mode == "Sellers by Min Rating":
-            return search_sellers_by_rating(float(query))
-        if mode == "In-Stock Products":
-            return filter_products_in_stock()
-        if mode == "Returned Orders":
-            return filter_returned_orders()
-        if mode == "Delivered Orders":
-            return filter_delivered_orders()
-        return []
+    def _set_sort_options(self, columns):
+        options = []
+        for field, label in columns:
+            if field in NUMERIC_FIELDS:
+                field_kind = "number"
+            elif field in DATE_FIELDS:
+                field_kind = "date"
+            else:
+                field_kind = "text"
+            options.append((field, label, field_kind))
+        self.sort_button.set_sort_options(options)
+
+    def _sort(self, field, descending):
+        self.table.sort_data(field, descending, field in NUMERIC_FIELDS)

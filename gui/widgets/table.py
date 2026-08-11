@@ -69,6 +69,23 @@ class DataTable(QTableWidget):
             return self._rows_data[index]
         return None
 
+    def sort_data(self, field, descending=False, numeric=False):
+        """Sort currently displayed rows without changing the active search."""
+        def sort_key(row):
+            value = row.get(field)
+            if value is None:
+                return (1, 0)
+
+            if numeric:
+                try:
+                    return (0, float(value))
+                except (TypeError, ValueError):
+                    return (1, 0)
+
+            return (0, str(value).casefold())
+
+        self.load_data(sorted(self._rows_data, key=sort_key, reverse=descending))
+
     def _on_selection_changed(self):
         row = self.get_selected_row()
         if row is not None:

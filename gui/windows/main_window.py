@@ -85,6 +85,7 @@ class MainWindow(QMainWindow):
         self.pages = {}
 
         self.dashboard_page = DashboardPage()
+        self.dashboard_page.page_requested.connect(self.show_page)
         self.products_page = ProductsPage()
         self.orders_page = OrdersPage()
         self.shipping_page = ShippingPage()

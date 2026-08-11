@@ -1,6 +1,6 @@
-"""
-CRUD - Create Operations
-"""
+"""CRUD create operations with consistent input normalization."""
+
+import re
 
 from config.mongodb import db
 from models.user import User
@@ -15,11 +15,39 @@ sellers = db["Sellers"]
 orders = db["Orders"]
 
 
+def _exact_case_insensitive(value):
+    """Build a safe exact-match query that ignores input letter case."""
+    return {"$regex": f"^{re.escape(str(value).strip())}$", "$options": "i"}
+
+
+def _normalize_id(value):
+    """Store IDs in the same uppercase format as the imported dataset."""
+    return str(value).strip().upper()
+
+
+def _normalize_product_label(field, value):
+    """Reuse the dataset's spelling/case when a matching label already exists."""
+    cleaned_value = " ".join(str(value).strip().split())
+    if not cleaned_value:
+        return ""
+
+    existing = products.find_one(
+        {field: _exact_case_insensitive(cleaned_value)},
+        {field: 1, "_id": 0},
+    )
+    if existing:
+        return existing[field]
+
+    return cleaned_value.title()
+
+
 # -----------------------------
 # Create User
 # -----------------------------
 def create_user(user_id):
-    if users.find_one({"user_id": user_id}):
+    user_id = _normalize_id(user_id)
+
+    if users.find_one({"user_id": _exact_case_insensitive(user_id)}):
         print(f"User {user_id} already exists.")
         return
 
@@ -43,8 +71,12 @@ def create_product(
     rating,
     review_count
 ):
+    product_id = _normalize_id(product_id)
+    category = _normalize_product_label("category", category)
+    subcategory = _normalize_product_label("subcategory", subcategory)
+    brand = _normalize_product_label("brand", brand)
 
-    if products.find_one({"product_id": product_id}):
+    if products.find_one({"product_id": _exact_case_insensitive(product_id)}):
         print(f"Product {product_id} already exists.")
         return
 
@@ -69,8 +101,9 @@ def create_product(
 # Create Seller
 # -----------------------------
 def create_seller(seller_id, seller_rating):
+    seller_id = _normalize_id(seller_id)
 
-    if sellers.find_one({"seller_id": seller_id}):
+    if sellers.find_one({"seller_id": _exact_case_insensitive(seller_id)}):
         print(f"Seller {seller_id} already exists.")
         return
 
@@ -94,6 +127,8 @@ def create_order(
     delivery_status,
     is_returned
 ):
+    user_id = _normalize_id(user_id)
+    product_id = _normalize_id(product_id)
 
     order = Order(
         user_id,

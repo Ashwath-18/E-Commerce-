@@ -34,6 +34,7 @@ class AddUserDialog(QDialog):
 
         self.user_id_input = QLineEdit()
         self.user_id_input.setPlaceholderText("e.g. U000123")
+        self.user_id_input.setMinimumHeight(48)
 
         form.addRow("User ID *", self.user_id_input)
 

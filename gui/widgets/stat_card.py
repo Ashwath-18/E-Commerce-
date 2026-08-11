@@ -5,16 +5,19 @@ and label.
 """
 
 from PySide6.QtWidgets import QFrame, QVBoxLayout, QLabel
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, Signal
 
 
 class StatCard(QFrame):
+
+    clicked = Signal()
 
     def __init__(self, icon_text, title, value="0", parent=None):
         super().__init__(parent)
 
         self.setObjectName("StatCard")
         self.setMinimumHeight(156)
+        self._clickable = False
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(24, 24, 24, 22)
@@ -46,3 +49,17 @@ class StatCard(QFrame):
 
     def set_value(self, value):
         self.value_label.setText(str(value))
+
+    def set_clickable(self, enabled, tooltip=""):
+        """Configure the card as a navigation control when a page exists."""
+        self._clickable = enabled
+        self.setProperty("clickable", enabled)
+        self.setToolTip(tooltip)
+        self.setCursor(Qt.PointingHandCursor if enabled else Qt.ArrowCursor)
+        self.style().unpolish(self)
+        self.style().polish(self)
+
+    def mouseReleaseEvent(self, event):
+        super().mouseReleaseEvent(event)
+        if self._clickable and event.button() == Qt.LeftButton:
+            self.clicked.emit()
