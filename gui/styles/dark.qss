@@ -598,3 +598,15 @@ QCalendarWidget QHeaderView::section {
     padding: 6px;
     font-weight: 700;
 }
+
+/* ---------------- AI Assistant ---------------- */
+#AIUserBubble { background-color: #211C4D; border: 1px solid #4C3C9A; border-radius: 16px; }
+#AIAssistantBubble { background-color: #0F0F1A; border: 1px solid #232335; border-radius: 16px; }
+#AIMessageRole { color: #C4B5FD; font-size: 12px; font-weight: 800; }
+#AIMessageText { color: #F8FAFC; font-size: 14px; line-height: 145%; }
+#AITyping { color: #A5ADBD; font-size: 12px; padding: 4px 8px; }
+#AISectionLabel { color: #A5ADBD; font-size: 12px; font-weight: 800; margin-top: 4px; }
+#AIProductCard { background-color: #151524; border: 1px solid #28283A; border-radius: 14px; }
+#AIProductTitle { color: #F8FAFC; font-size: 14px; font-weight: 800; }
+#AIProductPrice { color: #C4B5FD; font-size: 16px; font-weight: 800; }
+#AIProductMeta { color: #A5ADBD; font-size: 12px; }

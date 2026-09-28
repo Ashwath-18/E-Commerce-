@@ -17,6 +17,7 @@ from gui.styles import apply_theme
 
 def main():
     app = QApplication(sys.argv)
+    app.setQuitOnLastWindowClosed(False)
     app.setApplicationName("Cartify")
 
     apply_theme(app, "light")
