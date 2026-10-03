@@ -32,6 +32,7 @@ from database.helpers import (
     insert_order_item
 )
 
+
 def import_dataset():
     # ----------------------------------
     # Load Dataset
@@ -112,11 +113,7 @@ def import_dataset():
             # -----------------------------
 
             if user_id not in user_ids:
-
-                user = User(user_id)
-
-                insert_user(user.to_dict())
-
+                insert_user(User(user_id).to_dict())
                 user_ids.add(user_id)
 
             # -----------------------------
@@ -124,11 +121,7 @@ def import_dataset():
             # -----------------------------
 
             if category not in categories:
-
-                category_obj = Category(category)
-
-                insert_category(category_obj.to_dict())
-
+                insert_category(Category(category).to_dict())
                 categories.add(category)
 
             # -----------------------------
@@ -138,14 +131,7 @@ def import_dataset():
             sub_key = (category, subcategory)
 
             if sub_key not in subcategories:
-
-                subcategory_obj = SubCategory(
-                    category,
-                    subcategory
-                )
-
-                insert_subcategory(subcategory_obj.to_dict())
-
+                insert_subcategory(SubCategory(category, subcategory).to_dict())
                 subcategories.add(sub_key)
 
             # -----------------------------
@@ -153,18 +139,11 @@ def import_dataset():
             # -----------------------------
 
             if seller_id not in seller_ids:
-
-                seller = Seller(
-                    seller_id,
-                    seller_rating
-                )
-
-                insert_seller(seller.to_dict())
-
+                insert_seller(Seller(seller_id, seller_rating).to_dict())
                 seller_ids.add(seller_id)
 
             # -----------------------------
-            # Products
+            # Products (now keeps seller info)
             # -----------------------------
 
             if product_id not in product_ids:
@@ -179,11 +158,12 @@ def import_dataset():
                     final_price,
                     stock,
                     rating,
-                    review_count
+                    review_count,
+                    seller_id,
+                    seller_rating
                 )
 
                 insert_product(product.to_dict())
-
                 product_ids.add(product_id)
 
             # -----------------------------
@@ -208,73 +188,51 @@ def import_dataset():
             # Payments
             # -----------------------------
 
-            payment = Payment(
-                user_id,
-                product_id,
-                payment_method
+            insert_payment(
+                Payment(user_id, product_id, payment_method).to_dict()
             )
-
-            insert_payment(payment.to_dict())
 
             # -----------------------------
             # Shipping
             # -----------------------------
 
-            shipping = Shipping(
-                user_id,
-                product_id,
-                shipping_time_days,
-                location,
-                delivery_status
+            insert_shipping(
+                Shipping(
+                    user_id,
+                    product_id,
+                    shipping_time_days,
+                    location,
+                    delivery_status
+                ).to_dict()
             )
-
-            insert_shipping(shipping.to_dict())
 
             # -----------------------------
             # Reviews
             # -----------------------------
 
-            review = Review(
-                product_id,
-                rating,
-                review_count
+            insert_review(
+                Review(product_id, rating, review_count).to_dict()
             )
-
-            insert_review(review.to_dict())
 
             # -----------------------------
             # Inventory
             # -----------------------------
 
-            inventory = Inventory(
-                product_id,
-                stock
-            )
-
-            insert_inventory(inventory.to_dict())
+            insert_inventory(Inventory(product_id, stock).to_dict())
 
             # -----------------------------
             # Returns
             # -----------------------------
 
-            return_item = ReturnItem(
-                user_id,
-                product_id,
-                is_returned
+            insert_return(
+                ReturnItem(user_id, product_id, is_returned).to_dict()
             )
-
-            insert_return(return_item.to_dict())
 
             # -----------------------------
             # Order Items
             # -----------------------------
 
-            order_item = OrderItem(
-                user_id,
-                product_id
-            )
-
-            insert_order_item(order_item.to_dict())
+            insert_order_item(OrderItem(user_id, product_id).to_dict())
 
             count += 1
 
@@ -296,6 +254,7 @@ def import_dataset():
     print(f"Unique Categories     : {len(categories)}")
     print(f"Unique SubCategories  : {len(subcategories)}")
     print("===================================")
+
 
 if __name__ == "__main__":
     import_dataset()

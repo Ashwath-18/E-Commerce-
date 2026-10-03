@@ -14,18 +14,27 @@ Start MongoDB
 
 ## Step 3
 
-Initialize the database
+Initialize the database (run from the project root, only the first time)
 
 ```bash
-python database/initialize_database.py
+python -m database.initialize_database
 ```
 
-(Only the first time.)
+## Step 4 (optional)
 
-## Step 4
+For the AI assistant, create a `.env` file in the project root:
+
+```
+AI_API_KEY=your_key_here
+AI_MODEL=your_model_name
+```
+
+## Step 5
 
 Run the application
 
 ```bash
 python app.py
 ```
+
+Default login: `admin` / `admin`

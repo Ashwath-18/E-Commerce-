@@ -1,6 +1,7 @@
 """CRUD create operations with consistent input normalization."""
 
 import re
+from datetime import datetime
 
 from config.mongodb import db
 from models.user import User
@@ -48,8 +49,7 @@ def create_user(user_id):
     user_id = _normalize_id(user_id)
 
     if users.find_one({"user_id": _exact_case_insensitive(user_id)}):
-        print(f"User {user_id} already exists.")
-        return
+        raise ValueError(f"User {user_id} already exists.")
 
     user = User(user_id)
     users.insert_one(user.to_dict())
@@ -77,8 +77,7 @@ def create_product(
     brand = _normalize_product_label("brand", brand)
 
     if products.find_one({"product_id": _exact_case_insensitive(product_id)}):
-        print(f"Product {product_id} already exists.")
-        return
+        raise ValueError(f"Product {product_id} already exists.")
 
     product = Product(
         product_id,
@@ -104,8 +103,7 @@ def create_seller(seller_id, seller_rating):
     seller_id = _normalize_id(seller_id)
 
     if sellers.find_one({"seller_id": _exact_case_insensitive(seller_id)}):
-        print(f"Seller {seller_id} already exists.")
-        return
+        raise ValueError(f"Seller {seller_id} already exists.")
 
     seller = Seller(seller_id, seller_rating)
 
@@ -129,6 +127,17 @@ def create_order(
 ):
     user_id = _normalize_id(user_id)
     product_id = _normalize_id(product_id)
+
+    if not users.find_one({"user_id": _exact_case_insensitive(user_id)}):
+        raise ValueError(f"User {user_id} does not exist.")
+    if not products.find_one({"product_id": _exact_case_insensitive(product_id)}):
+        raise ValueError(f"Product {product_id} does not exist.")
+    try:
+        datetime.strptime(str(purchase_date), "%Y-%m-%d")
+    except ValueError:
+        raise ValueError("Purchase date must be in YYYY-MM-DD format.")
+    if int(shipping_time_days) < 0:
+        raise ValueError("Shipping time cannot be negative.")
 
     order = Order(
         user_id,

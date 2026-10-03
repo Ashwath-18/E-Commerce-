@@ -71,9 +71,13 @@ class ProductCard(QFrame):
         details.setWordWrap(True)
         layout.addWidget(details)
 
-        seller = QLabel(f"Seller rating: {product.get('seller_rating', '—')}  ·  Seller: {escape(str(product.get('seller_id') or '—'))}")
-        seller.setObjectName("AIProductMeta")
-        layout.addWidget(seller)
+        if product.get("seller_id"):
+            seller = QLabel(
+                f"Seller rating: {product.get('seller_rating', '—')}  ·  "
+                f"Seller: {escape(str(product['seller_id']))}"
+            )
+            seller.setObjectName("AIProductMeta")
+            layout.addWidget(seller)
 
     @staticmethod
     def _money(value):

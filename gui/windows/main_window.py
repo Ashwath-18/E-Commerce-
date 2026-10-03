@@ -7,7 +7,7 @@ the Navbar/Sidebar logo in sync with the active theme.
 
 import os
 from PySide6.QtWidgets import (
-    QMainWindow, QWidget, QHBoxLayout, QVBoxLayout, QStackedWidget,
+    QApplication, QMainWindow, QWidget, QHBoxLayout, QVBoxLayout, QStackedWidget,
     QFrame, QGraphicsDropShadowEffect
 )
 from PySide6.QtGui import QColor
@@ -38,6 +38,7 @@ class MainWindow(QMainWindow):
 
         self.app = app
         self.current_theme = "light"
+        self._logging_out = False
 
         self.setWindowTitle("Cartify")
         self.resize(1500, 850)
@@ -152,9 +153,17 @@ class MainWindow(QMainWindow):
                 effect.setColor(shadow_color)
                 frame.setGraphicsEffect(effect)
 
+    def closeEvent(self, event):
+        super().closeEvent(event)
+        # Closing the window with the X button must end the application
+        # (app.py disables quit-on-last-window-closed for splash/login).
+        if not self._logging_out:
+            QApplication.quit()
+
     def logout(self):
         from gui.windows.login_window import LoginWindow
 
+        self._logging_out = True
         self.close()
 
         self._login_window = LoginWindow(self.asset_path)

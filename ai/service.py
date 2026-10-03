@@ -237,9 +237,14 @@ class ShoppingAssistant:
 
     @staticmethod
     def _is_order_request(message):
+        # Only personal order/shipment questions ("where is my order",
+        # "track my shipment", "order status"), not phrases like
+        # "in order to" or "fast delivery".
         return bool(
             re.search(
-                r"\b(order|orders|shipment|shipped|delivery|delivered)\b",
+                r"\b(my|track|tracking|where is|status of|cancel|return)\b.{0,30}"
+                r"\b(orders?|shipments?|packages?|deliver(?:y|ies))\b"
+                r"|\b(orders?|shipment|package)\s+(status|history|id|number)\b",
                 message.casefold(),
             )
         )

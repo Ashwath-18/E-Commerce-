@@ -11,25 +11,28 @@ orders = db["Orders"]
 
 
 # -----------------------------
-# Update Product Price
+# Update Product Price (also recalculates final_price)
 # -----------------------------
 def update_product_price(product_id, new_price):
 
-    result = products.update_one(
-        {"product_id": product_id},
-        {"$set": {"price": new_price}}
-    )
+    product = products.find_one({"product_id": product_id})
 
-    if result.matched_count == 0:
+    if not product:
         print("Product not found.")
-    elif result.modified_count == 0:
-        print("Price is already the same.")
-    else:
-        print("Product price updated successfully.")
+        return
+
+    discount = float(product.get("discount", 0) or 0)
+    final_price = round(float(new_price) * (1 - discount / 100), 2)
+
+    products.update_one(
+        {"product_id": product_id},
+        {"$set": {"price": new_price, "final_price": final_price}}
+    )
+    print("Product price updated successfully.")
 
 
 # -----------------------------
-# Update Product Stock
+# Update Product Stock (also syncs Inventory)
 # -----------------------------
 def update_product_stock(product_id, new_stock):
 
@@ -40,10 +43,13 @@ def update_product_stock(product_id, new_stock):
 
     if result.matched_count == 0:
         print("Product not found.")
-    elif result.modified_count == 0:
-        print("Stock is already the same.")
-    else:
-        print("Product stock updated successfully.")
+        return
+
+    db["Inventory"].update_many(
+        {"product_id": product_id},
+        {"$set": {"stock": new_stock}}
+    )
+    print("Product stock updated successfully.")
 
 
 # -----------------------------
@@ -83,25 +89,17 @@ def update_seller_rating(seller_id, new_rating):
 
 
 # -----------------------------
-# Update Delivery Status
+# Update Delivery Status (also syncs Shipping)
 # -----------------------------
 def update_delivery_status(user_id, product_id, new_status):
 
-    result = orders.update_one(
-        {
-            "user_id": user_id,
-            "product_id": product_id
-        },
-        {
-            "$set": {
-                "delivery_status": new_status
-            }
-        }
-    )
+    key = {"user_id": user_id, "product_id": product_id}
+
+    result = orders.update_one(key, {"$set": {"delivery_status": new_status}})
 
     if result.matched_count == 0:
         print("Order not found.")
-    elif result.modified_count == 0:
-        print("Delivery status is already the same.")
-    else:
-        print("Delivery status updated successfully.")
+        return
+
+    db["Shipping"].update_many(key, {"$set": {"delivery_status": new_status}})
+    print("Delivery status updated successfully.")

@@ -1,0 +1,1359 @@
+# ================================================================
+# MULTIVARIATE STATISTICAL ANALYSIS OF BREAST CANCER DATA
+# ================================================================
+#
+# Techniques used:
+# 1. Data Preprocessing + EDA + Correlation Analysis
+# 2. Factor Analysis
+# 3. PCA + Spectral Decomposition
+# 4. Classification + Confusion Matrix + Model Evaluation
+#
+# Dataset: Breast Cancer Wisconsin Diagnostic Dataset
+# ================================================================
+
+
+# ================================================================
+# IMPORT LIBRARIES
+# ================================================================
+
+import os
+import warnings
+
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+from scipy.stats import chi2
+from sklearn.preprocessing import StandardScaler
+from sklearn.decomposition import FactorAnalysis, PCA
+from sklearn.model_selection import train_test_split
+from sklearn.linear_model import LogisticRegression
+from sklearn.pipeline import Pipeline
+from sklearn.metrics import (
+    accuracy_score,
+    precision_score,
+    recall_score,
+    f1_score,
+    roc_auc_score,
+    confusion_matrix,
+    classification_report,
+    roc_curve
+)
+
+warnings.filterwarnings("ignore")
+
+
+# ================================================================
+# SETTINGS
+# ================================================================
+FILE_NAME = r"C:\Users\gsree\Downloads\breast-cancer.xlsx"
+
+# Folder to save graphs
+OUTPUT_FOLDER = "breast_cancer_outputs"
+os.makedirs(OUTPUT_FOLDER, exist_ok=True)
+
+RANDOM_STATE = 42
+
+
+# ================================================================
+# LOAD DATASET
+# ================================================================
+
+print("=" * 75)
+print("LOADING BREAST CANCER DATASET")
+print("=" * 75)
+
+df = pd.read_excel(FILE_NAME)
+
+print("\nOriginal dataset shape:", df.shape)
+
+print("\nFirst 5 rows:")
+print(df.head())
+
+
+# ================================================================
+# DATA CLEANING
+# ================================================================
+
+print("\n" + "=" * 75)
+print("DATA CLEANING")
+print("=" * 75)
+
+# Remove completely empty columns
+df = df.dropna(axis=1, how="all")
+
+# Remove common unnecessary index column if present
+for col in ["Unnamed: 32", "Unnamed: 32.1"]:
+    if col in df.columns:
+        df = df.drop(columns=[col])
+
+# Remove ID column because it is only an identifier
+if "id" in df.columns:
+    df = df.drop(columns=["id"])
+
+# Find diagnosis column
+diagnosis_col = None
+
+for col in df.columns:
+    if str(col).lower().strip() in ["diagnosis", "target", "label"]:
+        diagnosis_col = col
+        break
+
+if diagnosis_col is None:
+    raise ValueError(
+        "Diagnosis/target column was not found. "
+        "Please check the Excel column name."
+    )
+
+print("\nTarget column:", diagnosis_col)
+
+# Convert diagnosis:
+# Malignant = 1
+# Benign = 0
+df[diagnosis_col] = (
+    df[diagnosis_col]
+    .astype(str)
+    .str.upper()
+    .str.strip()
+    .map({"M": 1, "B": 0})
+)
+
+# Remove rows where target could not be converted
+df = df.dropna(subset=[diagnosis_col])
+
+# Convert all remaining columns to numeric
+feature_columns = [col for col in df.columns if col != diagnosis_col]
+
+for col in feature_columns:
+    df[col] = pd.to_numeric(df[col], errors="coerce")
+
+# Remove rows with missing values
+df = df.dropna()
+
+# Separate X and y
+X = df[feature_columns].copy()
+y = df[diagnosis_col].astype(int).copy()
+
+print("\nCleaned dataset shape:", df.shape)
+print("Number of observations:", X.shape[0])
+print("Number of numerical features:", X.shape[1])
+
+print("\nTarget coding:")
+print("0 = Benign")
+print("1 = Malignant")
+
+print("\nClass distribution:")
+print(y.value_counts())
+
+
+# ================================================================
+# MEMBER 1
+# DATA PREPROCESSING + EDA + CORRELATION ANALYSIS
+# ================================================================
+
+print("\n" + "=" * 75)
+print("MEMBER 1: DATA PREPROCESSING + EDA + CORRELATION")
+print("=" * 75)
+
+
+# ------------------------------------------------
+# 1. BASIC DATA INFORMATION
+# ------------------------------------------------
+
+print("\n--- DATA INFORMATION ---")
+
+print("\nShape:")
+print(X.shape)
+
+print("\nData types:")
+print(X.dtypes)
+
+print("\nMissing values:")
+print(X.isnull().sum().sum())
+
+print("\nDuplicate rows:")
+print(X.duplicated().sum())
+
+
+# ------------------------------------------------
+# 2. DESCRIPTIVE STATISTICS
+# ------------------------------------------------
+
+print("\n--- DESCRIPTIVE STATISTICS ---")
+
+descriptive_stats = X.describe().T
+
+print(descriptive_stats)
+
+
+# Save descriptive statistics
+descriptive_stats.to_csv(
+    os.path.join(OUTPUT_FOLDER, "descriptive_statistics.csv")
+)
+
+
+# ------------------------------------------------
+# 3. CLASS DISTRIBUTION
+# ------------------------------------------------
+
+print("\n--- CLASS DISTRIBUTION ---")
+
+class_counts = y.value_counts().sort_index()
+
+print("Benign:", class_counts.get(0, 0))
+print("Malignant:", class_counts.get(1, 0))
+
+plt.figure(figsize=(6, 5))
+
+sns.countplot(
+    x=y.map({0: "Benign", 1: "Malignant"})
+)
+
+plt.title("Distribution of Benign and Malignant Cases")
+plt.xlabel("Diagnosis")
+plt.ylabel("Number of Cases")
+plt.tight_layout()
+
+plt.savefig(
+    os.path.join(OUTPUT_FOLDER, "class_distribution.png"),
+    dpi=300
+)
+
+plt.show()
+
+
+# ------------------------------------------------
+# 4. FEATURE DISTRIBUTION
+# ------------------------------------------------
+
+# Plot first 6 features to avoid producing 30 separate graphs
+
+selected_features = feature_columns[:6]
+
+X[selected_features].hist(
+    figsize=(12, 8),
+    bins=20
+)
+
+plt.suptitle("Distribution of Selected Tumor Features")
+plt.tight_layout()
+
+plt.savefig(
+    os.path.join(OUTPUT_FOLDER, "feature_distributions.png"),
+    dpi=300
+)
+
+plt.show()
+
+
+# ------------------------------------------------
+# 5. CORRELATION MATRIX
+# ------------------------------------------------
+
+print("\n--- CORRELATION ANALYSIS ---")
+
+correlation_matrix = X.corr()
+
+print("\nCorrelation matrix:")
+print(correlation_matrix.round(3))
+
+
+plt.figure(figsize=(14, 11))
+
+sns.heatmap(
+    correlation_matrix,
+    cmap="coolwarm",
+    center=0,
+    linewidths=0.3
+)
+
+plt.title("Correlation Heatmap of Tumor Features")
+plt.tight_layout()
+
+plt.savefig(
+    os.path.join(OUTPUT_FOLDER, "correlation_heatmap.png"),
+    dpi=300
+)
+
+plt.show()
+
+
+# ------------------------------------------------
+# 6. HIGHLY CORRELATED FEATURE PAIRS
+# ------------------------------------------------
+
+print("\n--- HIGHLY CORRELATED FEATURE PAIRS ---")
+
+high_corr_pairs = []
+
+for i in range(len(feature_columns)):
+    for j in range(i + 1, len(feature_columns)):
+
+        correlation = correlation_matrix.iloc[i, j]
+
+        if abs(correlation) >= 0.90:
+            high_corr_pairs.append(
+                (
+                    feature_columns[i],
+                    feature_columns[j],
+                    correlation
+                )
+            )
+
+high_corr_df = pd.DataFrame(
+    high_corr_pairs,
+    columns=["Feature 1", "Feature 2", "Correlation"]
+)
+
+high_corr_df = high_corr_df.sort_values(
+    "Correlation",
+    key=abs,
+    ascending=False
+)
+
+print(high_corr_df.to_string(index=False))
+
+
+# ================================================================
+# STANDARDIZATION
+# ================================================================
+
+print("\n--- STANDARDIZATION ---")
+
+scaler_full = StandardScaler()
+
+X_scaled = scaler_full.fit_transform(X)
+
+X_scaled_df = pd.DataFrame(
+    X_scaled,
+    columns=feature_columns
+)
+
+print("\nStandardization completed.")
+print("Mean of first 5 standardized features:")
+print(X_scaled_df.iloc[:, :5].mean().round(4).to_string())
+
+print("\nStandard deviation of first 5 standardized features:")
+print(X_scaled_df.iloc[:, :5].std().round(4).to_string())
+
+
+# ================================================================
+# MEMBER 2
+# FACTOR ANALYSIS
+# ================================================================
+
+print("\n" + "=" * 75)
+print("MEMBER 2: FACTOR ANALYSIS")
+print("=" * 75)
+
+
+# ------------------------------------------------
+# 1. BARTLETT'S TEST
+# ------------------------------------------------
+
+print("\n--- BARTLETT'S TEST OF SPHERICITY ---")
+
+n, p = X_scaled.shape
+
+corr_matrix = np.corrcoef(X_scaled.T)
+
+det_corr = np.linalg.det(corr_matrix)
+
+chi_square_value = -(
+    n - 1 - (2 * p + 5) / 6
+) * np.log(det_corr)
+
+degrees_of_freedom = p * (p - 1) / 2
+
+bartlett_p_value = chi2.sf(
+    chi_square_value,
+    degrees_of_freedom
+)
+
+print(
+    f"Chi-square = {chi_square_value:.3f}"
+)
+
+print(
+    f"Degrees of freedom = {degrees_of_freedom:.0f}"
+)
+
+print(
+    f"p-value = {bartlett_p_value:.6g}"
+)
+
+if bartlett_p_value < 0.05:
+    print(
+        "Conclusion: The correlation matrix is significantly "
+        "different from an identity matrix."
+    )
+    print(
+        "Factor Analysis is appropriate based on Bartlett's test."
+    )
+else:
+    print(
+        "Conclusion: Bartlett's test is not significant."
+    )
+
+
+# ------------------------------------------------
+# 2. DETERMINE NUMBER OF FACTORS
+# ------------------------------------------------
+
+print("\n--- DETERMINING NUMBER OF FACTORS ---")
+
+# Eigenvalues of correlation matrix
+fa_eigenvalues = np.linalg.eigvalsh(corr_matrix)
+
+# Sort descending
+fa_eigenvalues = np.sort(fa_eigenvalues)[::-1]
+
+print("\nFirst 10 eigenvalues:")
+
+for i, value in enumerate(fa_eigenvalues[:10], start=1):
+    print(f"Factor {i}: {value:.4f}")
+
+
+# Kaiser criterion:
+# retain factors with eigenvalue > 1
+
+kaiser_factors = np.sum(fa_eigenvalues > 1)
+
+print(
+    f"\nNumber of factors using Kaiser criterion: "
+    f"{kaiser_factors}"
+)
+
+# To keep the project easy to explain,
+# use at least 2 factors.
+n_factors = max(2, min(kaiser_factors, 6))
+
+print(
+    f"Number of factors selected for Factor Analysis: "
+    f"{n_factors}"
+)
+
+
+# ------------------------------------------------
+# 3. SCREE PLOT FOR FACTOR ANALYSIS
+# ------------------------------------------------
+
+plt.figure(figsize=(8, 5))
+
+plt.plot(
+    range(1, len(fa_eigenvalues) + 1),
+    fa_eigenvalues,
+    marker="o"
+)
+
+plt.axhline(
+    y=1,
+    linestyle="--",
+    label="Eigenvalue = 1"
+)
+
+plt.title("Scree Plot for Factor Analysis")
+plt.xlabel("Factor Number")
+plt.ylabel("Eigenvalue")
+plt.legend()
+plt.tight_layout()
+
+plt.savefig(
+    os.path.join(OUTPUT_FOLDER, "factor_scree_plot.png"),
+    dpi=300
+)
+
+plt.show()
+
+
+# ------------------------------------------------
+# 4. FACTOR ANALYSIS
+# ------------------------------------------------
+
+print("\n--- FACTOR ANALYSIS RESULTS ---")
+
+fa = FactorAnalysis(
+    n_components=n_factors,
+    random_state=RANDOM_STATE
+)
+
+fa_scores = fa.fit_transform(X_scaled)
+
+# Factor loadings
+fa_loadings = pd.DataFrame(
+    fa.components_.T,
+    index=feature_columns,
+    columns=[
+        f"Factor {i + 1}"
+        for i in range(n_factors)
+    ]
+)
+
+print("\nFactor Loadings:")
+print(fa_loadings.round(3))
+
+
+# ------------------------------------------------
+# 5. TOP VARIABLES FOR EACH FACTOR
+# ------------------------------------------------
+
+print("\n--- TOP VARIABLES FOR EACH FACTOR ---")
+
+for factor in fa_loadings.columns:
+
+    print(f"\n{factor}:")
+
+    top_features = (
+        fa_loadings[factor]
+        .abs()
+        .sort_values(ascending=False)
+        .head(5)
+    )
+
+    for feature in top_features.index:
+
+        loading = fa_loadings.loc[feature, factor]
+
+        print(
+            f"{feature}: loading = {loading:.4f}"
+        )
+
+
+# ------------------------------------------------
+# 6. FACTOR LOADING HEATMAP
+# ------------------------------------------------
+
+plt.figure(
+    figsize=(8, max(8, n_factors * 2))
+)
+
+sns.heatmap(
+    fa_loadings,
+    cmap="coolwarm",
+    center=0,
+    annot=False
+)
+
+plt.title(
+    f"Factor Analysis Loadings ({n_factors} Factors)"
+)
+
+plt.xlabel("Factors")
+plt.ylabel("Features")
+
+plt.tight_layout()
+
+plt.savefig(
+    os.path.join(
+        OUTPUT_FOLDER,
+        "factor_loadings_heatmap.png"
+    ),
+    dpi=300
+)
+
+plt.show()
+
+
+# ------------------------------------------------
+# 7. COMMUNALITY
+# ------------------------------------------------
+
+communalities = (
+    fa_loadings ** 2
+).sum(axis=1)
+
+communalities_df = pd.DataFrame(
+    {
+        "Feature": feature_columns,
+        "Communality": communalities
+    }
+).sort_values(
+    "Communality",
+    ascending=False
+)
+
+print("\n--- COMMUNALITIES ---")
+print(communalities_df.round(4).to_string(index=False))
+
+
+# ================================================================
+# MEMBER 3
+# PCA + SPECTRAL DECOMPOSITION
+# ================================================================
+
+print("\n" + "=" * 75)
+print("MEMBER 3: PCA + SPECTRAL DECOMPOSITION")
+print("=" * 75)
+
+
+# ------------------------------------------------
+# 1. COVARIANCE MATRIX
+# ------------------------------------------------
+
+print("\n--- COVARIANCE MATRIX ---")
+
+covariance_matrix = np.cov(
+    X_scaled,
+    rowvar=False
+)
+
+covariance_df = pd.DataFrame(
+    covariance_matrix,
+    index=feature_columns,
+    columns=feature_columns
+)
+
+print(
+    "\nFirst 5 x 5 section of covariance matrix:"
+)
+
+print(
+    covariance_df.iloc[:5, :5].round(3)
+)
+
+
+# ------------------------------------------------
+# 2. SPECTRAL DECOMPOSITION
+# ------------------------------------------------
+
+print("\n--- SPECTRAL DECOMPOSITION ---")
+
+# For a symmetric covariance matrix,
+# eigh() is preferred over eig()
+
+eigenvalues, eigenvectors = np.linalg.eigh(
+    covariance_matrix
+)
+
+# Sort eigenvalues in descending order
+order = np.argsort(eigenvalues)[::-1]
+
+eigenvalues = eigenvalues[order]
+eigenvectors = eigenvectors[:, order]
+
+
+print("\nTop 10 eigenvalues:")
+
+for i, value in enumerate(eigenvalues[:10], start=1):
+
+    print(
+        f"Lambda {i} = {value:.6f}"
+    )
+
+
+# ------------------------------------------------
+# 3. EXPLAINED VARIANCE
+# ------------------------------------------------
+
+explained_variance_ratio = (
+    eigenvalues / eigenvalues.sum()
+)
+
+cumulative_variance = np.cumsum(
+    explained_variance_ratio
+)
+
+pca_summary = pd.DataFrame(
+    {
+        "Principal Component":
+            np.arange(1, len(eigenvalues) + 1),
+
+        "Eigenvalue":
+            eigenvalues,
+
+        "Explained Variance (%)":
+            explained_variance_ratio * 100,
+
+        "Cumulative Variance (%)":
+            cumulative_variance * 100
+    }
+)
+
+print("\n--- PCA VARIANCE SUMMARY ---")
+
+print(
+    pca_summary.head(10).round(4).to_string(index=False)
+)
+
+
+# ------------------------------------------------
+# 4. NUMBER OF COMPONENTS FOR 95% VARIANCE
+# ------------------------------------------------
+
+n_components_95 = (
+    np.argmax(cumulative_variance >= 0.95) + 1
+)
+
+print(
+    f"\nNumber of PCs required to explain "
+    f"at least 95% variance: {n_components_95}"
+)
+
+print(
+    f"Variance explained by these PCs: "
+    f"{cumulative_variance[n_components_95 - 1] * 100:.2f}%"
+)
+
+
+# ------------------------------------------------
+# 5. SCREE PLOT
+# ------------------------------------------------
+
+plt.figure(figsize=(9, 5))
+
+plt.plot(
+    range(1, len(eigenvalues) + 1),
+    eigenvalues,
+    marker="o"
+)
+
+plt.axhline(
+    y=1,
+    linestyle="--",
+    label="Kaiser criterion (eigenvalue = 1)"
+)
+
+plt.title("Scree Plot of PCA Eigenvalues")
+plt.xlabel("Principal Component")
+plt.ylabel("Eigenvalue")
+plt.legend()
+
+plt.tight_layout()
+
+plt.savefig(
+    os.path.join(
+        OUTPUT_FOLDER,
+        "pca_scree_plot.png"
+    ),
+    dpi=300
+)
+
+plt.show()
+
+
+# ------------------------------------------------
+# 6. CUMULATIVE VARIANCE PLOT
+# ------------------------------------------------
+
+plt.figure(figsize=(9, 5))
+
+plt.plot(
+    range(1, len(cumulative_variance) + 1),
+    cumulative_variance * 100,
+    marker="o"
+)
+
+plt.axhline(
+    y=95,
+    linestyle="--",
+    label="95% variance"
+)
+
+plt.axvline(
+    x=n_components_95,
+    linestyle="--",
+    label=f"{n_components_95} components"
+)
+
+plt.title("Cumulative Explained Variance")
+plt.xlabel("Number of Principal Components")
+plt.ylabel("Cumulative Variance (%)")
+plt.legend()
+
+plt.tight_layout()
+
+plt.savefig(
+    os.path.join(
+        OUTPUT_FOLDER,
+        "cumulative_variance.png"
+    ),
+    dpi=300
+)
+
+plt.show()
+
+
+# ------------------------------------------------
+# 7. VERIFY SPECTRAL DECOMPOSITION
+# ------------------------------------------------
+
+print("\n--- SPECTRAL DECOMPOSITION VERIFICATION ---")
+
+# Sigma = Q Lambda Q^T
+
+reconstructed_covariance = (
+    eigenvectors
+    @ np.diag(eigenvalues)
+    @ eigenvectors.T
+)
+
+reconstruction_error = np.linalg.norm(
+    covariance_matrix - reconstructed_covariance
+)
+
+print(
+    "Reconstruction error:",
+    f"{reconstruction_error:.10f}"
+)
+
+if reconstruction_error < 1e-8:
+    print(
+        "The covariance matrix is successfully "
+        "reconstructed using spectral decomposition."
+    )
+
+
+# ------------------------------------------------
+# 8. PCA USING SKLEARN
+# ------------------------------------------------
+
+print("\n--- PCA TRANSFORMATION ---")
+
+pca = PCA(
+    n_components=n_components_95
+)
+
+X_pca = pca.fit_transform(X_scaled)
+
+pca_columns = [
+    f"PC{i + 1}"
+    for i in range(n_components_95)
+]
+
+X_pca_df = pd.DataFrame(
+    X_pca,
+    columns=pca_columns
+)
+
+print(
+    "\nShape of original standardized data:",
+    X_scaled.shape
+)
+
+print(
+    "Shape after PCA:",
+    X_pca.shape
+)
+
+
+# ------------------------------------------------
+# 9. PCA LOADINGS
+# ------------------------------------------------
+
+pca_loadings = pd.DataFrame(
+    pca.components_.T,
+    index=feature_columns,
+    columns=pca_columns
+)
+
+print("\n--- TOP FEATURES FOR FIRST TWO PCs ---")
+
+for pc in pca_columns[:2]:
+
+    print(f"\n{pc}:")
+
+    top_features = (
+        pca_loadings[pc]
+        .abs()
+        .sort_values(ascending=False)
+        .head(5)
+    )
+
+    for feature in top_features.index:
+
+        loading = pca_loadings.loc[
+            feature,
+            pc
+        ]
+
+        print(
+            f"{feature}: loading = {loading:.4f}"
+        )
+
+
+# ------------------------------------------------
+# 10. PC1 vs PC2 GRAPH
+# ------------------------------------------------
+
+plt.figure(figsize=(8, 6))
+
+sns.scatterplot(
+    x=X_pca_df["PC1"],
+    y=X_pca_df["PC2"],
+    hue=y.map({
+        0: "Benign",
+        1: "Malignant"
+    }),
+    alpha=0.7
+)
+
+plt.title("PCA: PC1 vs PC2")
+plt.xlabel("Principal Component 1")
+plt.ylabel("Principal Component 2")
+plt.legend(title="Diagnosis")
+
+plt.tight_layout()
+
+plt.savefig(
+    os.path.join(
+        OUTPUT_FOLDER,
+        "pca_pc1_pc2.png"
+    ),
+    dpi=300
+)
+
+plt.show()
+
+
+# ================================================================
+# MEMBER 4
+# CLASSIFICATION + CONFUSION MATRIX
+# ================================================================
+
+print("\n" + "=" * 75)
+print("MEMBER 4: CLASSIFICATION + CONFUSION MATRIX")
+print("=" * 75)
+
+
+# ------------------------------------------------
+# IMPORTANT:
+# Split RAW data BEFORE scaling.
+#
+# This prevents data leakage.
+# ------------------------------------------------
+
+X_train, X_test, y_train, y_test = train_test_split(
+    X,
+    y,
+    test_size=0.25,
+    random_state=RANDOM_STATE,
+    stratify=y
+)
+
+print("\nTraining samples:", X_train.shape[0])
+print("Testing samples:", X_test.shape[0])
+
+
+# ================================================================
+# MODEL 1
+# LOGISTIC REGRESSION USING ORIGINAL FEATURES
+# ================================================================
+
+print("\n--- MODEL 1: LOGISTIC REGRESSION WITH ORIGINAL FEATURES ---")
+
+original_model = Pipeline(
+    [
+        (
+            "scaler",
+            StandardScaler()
+        ),
+
+        (
+            "classifier",
+            LogisticRegression(
+                max_iter=5000,
+                random_state=RANDOM_STATE
+            )
+        )
+    ]
+)
+
+original_model.fit(
+    X_train,
+    y_train
+)
+
+y_pred_original = original_model.predict(
+    X_test
+)
+
+y_prob_original = original_model.predict_proba(
+    X_test
+)[:, 1]
+
+
+# ================================================================
+# MODEL 2
+# PCA + LOGISTIC REGRESSION
+# ================================================================
+
+print("\n--- MODEL 2: PCA + LOGISTIC REGRESSION ---")
+
+pca_model = Pipeline(
+    [
+        (
+            "scaler",
+            StandardScaler()
+        ),
+
+        (
+            "pca",
+            PCA(
+                n_components=0.95,
+                random_state=RANDOM_STATE
+            )
+        ),
+
+        (
+            "classifier",
+            LogisticRegression(
+                max_iter=5000,
+                random_state=RANDOM_STATE
+            )
+        )
+    ]
+)
+
+pca_model.fit(
+    X_train,
+    y_train
+)
+
+y_pred_pca = pca_model.predict(
+    X_test
+)
+
+y_prob_pca = pca_model.predict_proba(
+    X_test
+)[:, 1]
+
+
+# ================================================================
+# FUNCTION TO CALCULATE METRICS
+# ================================================================
+
+def calculate_metrics(
+    y_true,
+    y_pred,
+    y_probability
+):
+
+    return {
+        "Accuracy": accuracy_score(
+            y_true,
+            y_pred
+        ),
+
+        "Precision": precision_score(
+            y_true,
+            y_pred,
+            zero_division=0
+        ),
+
+        "Recall / Sensitivity": recall_score(
+            y_true,
+            y_pred,
+            zero_division=0
+        ),
+
+        "F1 Score": f1_score(
+            y_true,
+            y_pred,
+            zero_division=0
+        ),
+
+        "ROC-AUC": roc_auc_score(
+            y_true,
+            y_probability
+        )
+    }
+
+
+# ================================================================
+# MODEL COMPARISON
+# ================================================================
+
+results_original = calculate_metrics(
+    y_test,
+    y_pred_original,
+    y_prob_original
+)
+
+results_pca = calculate_metrics(
+    y_test,
+    y_pred_pca,
+    y_prob_pca
+)
+
+results_df = pd.DataFrame(
+    [
+        results_original,
+        results_pca
+    ],
+    index=[
+        "Original Features",
+        "PCA Features"
+    ]
+)
+
+print("\n" + "=" * 75)
+print("MODEL PERFORMANCE COMPARISON")
+print("=" * 75)
+
+print(
+    results_df.round(4)
+)
+
+
+# Save model results
+results_df.to_csv(
+    os.path.join(
+        OUTPUT_FOLDER,
+        "model_comparison.csv"
+    )
+)
+
+
+# ================================================================
+# CONFUSION MATRIX - ORIGINAL FEATURES
+# ================================================================
+
+print("\n--- CONFUSION MATRIX: ORIGINAL FEATURES ---")
+
+cm_original = confusion_matrix(
+    y_test,
+    y_pred_original
+)
+
+print(cm_original)
+
+plt.figure(figsize=(6, 5))
+
+sns.heatmap(
+    cm_original,
+    annot=True,
+    fmt="d",
+    cmap="Blues",
+    xticklabels=["Benign", "Malignant"],
+    yticklabels=["Benign", "Malignant"]
+)
+
+plt.title(
+    "Confusion Matrix - Original Features"
+)
+
+plt.xlabel("Predicted Class")
+plt.ylabel("Actual Class")
+
+plt.tight_layout()
+
+plt.savefig(
+    os.path.join(
+        OUTPUT_FOLDER,
+        "confusion_matrix_original.png"
+    ),
+    dpi=300
+)
+
+plt.show()
+
+
+# ================================================================
+# CONFUSION MATRIX - PCA FEATURES
+# ================================================================
+
+print("\n--- CONFUSION MATRIX: PCA FEATURES ---")
+
+cm_pca = confusion_matrix(
+    y_test,
+    y_pred_pca
+)
+
+print(cm_pca)
+
+plt.figure(figsize=(6, 5))
+
+sns.heatmap(
+    cm_pca,
+    annot=True,
+    fmt="d",
+    cmap="Blues",
+    xticklabels=["Benign", "Malignant"],
+    yticklabels=["Benign", "Malignant"]
+)
+
+plt.title(
+    "Confusion Matrix - PCA Features"
+)
+
+plt.xlabel("Predicted Class")
+plt.ylabel("Actual Class")
+
+plt.tight_layout()
+
+plt.savefig(
+    os.path.join(
+        OUTPUT_FOLDER,
+        "confusion_matrix_pca.png"
+    ),
+    dpi=300
+)
+
+plt.show()
+
+
+# ================================================================
+# CLASSIFICATION REPORT
+# ================================================================
+
+print("\n" + "=" * 75)
+print("CLASSIFICATION REPORT - ORIGINAL FEATURES")
+print("=" * 75)
+
+print(
+    classification_report(
+        y_test,
+        y_pred_original,
+        target_names=[
+            "Benign",
+            "Malignant"
+        ]
+    )
+)
+
+
+print("\n" + "=" * 75)
+print("CLASSIFICATION REPORT - PCA FEATURES")
+print("=" * 75)
+
+print(
+    classification_report(
+        y_test,
+        y_pred_pca,
+        target_names=[
+            "Benign",
+            "Malignant"
+        ]
+    )
+)
+
+
+# ================================================================
+# ROC CURVE
+# ================================================================
+
+fpr_original, tpr_original, _ = roc_curve(
+    y_test,
+    y_prob_original
+)
+
+fpr_pca, tpr_pca, _ = roc_curve(
+    y_test,
+    y_prob_pca
+)
+
+auc_original = roc_auc_score(
+    y_test,
+    y_prob_original
+)
+
+auc_pca = roc_auc_score(
+    y_test,
+    y_prob_pca
+)
+
+
+plt.figure(figsize=(8, 6))
+
+plt.plot(
+    fpr_original,
+    tpr_original,
+    label=f"Original Features (AUC = {auc_original:.3f})"
+)
+
+plt.plot(
+    fpr_pca,
+    tpr_pca,
+    label=f"PCA Features (AUC = {auc_pca:.3f})"
+)
+
+plt.plot(
+    [0, 1],
+    [0, 1],
+    linestyle="--",
+    label="Random Classifier"
+)
+
+plt.title("ROC Curve Comparison")
+plt.xlabel("False Positive Rate")
+plt.ylabel("True Positive Rate")
+plt.legend()
+
+plt.tight_layout()
+
+plt.savefig(
+    os.path.join(
+        OUTPUT_FOLDER,
+        "roc_curve_comparison.png"
+    ),
+    dpi=300
+)
+
+plt.show()
+
+
+# ================================================================
+# FINAL SUMMARY
+# ================================================================
+
+print("\n" + "=" * 75)
+print("FINAL PROJECT SUMMARY")
+print("=" * 75)
+
+print("\nDataset:")
+print(f"Observations = {X.shape[0]}")
+print(f"Original Features = {X.shape[1]}")
+
+print("\nFactor Analysis:")
+print(f"Factors selected = {n_factors}")
+
+print("\nPCA:")
+print(
+    f"Components required for 95% variance = "
+    f"{n_components_95}"
+)
+
+print(
+    f"Variance retained = "
+    f"{cumulative_variance[n_components_95 - 1] * 100:.2f}%"
+)
+
+print("\nClassification:")
+
+print(
+    f"Original Features Accuracy = "
+    f"{results_original['Accuracy']:.4f}"
+)
+
+print(
+    f"PCA Features Accuracy = "
+    f"{results_pca['Accuracy']:.4f}"
+)
+
+print(
+    f"Original Features F1 Score = "
+    f"{results_original['F1 Score']:.4f}"
+)
+
+print(
+    f"PCA Features F1 Score = "
+    f"{results_pca['F1 Score']:.4f}"
+)
+
+print(
+    f"Original Features ROC-AUC = "
+    f"{results_original['ROC-AUC']:.4f}"
+)
+
+print(
+    f"PCA Features ROC-AUC = "
+    f"{results_pca['ROC-AUC']:.4f}"
+)
+
+print("\nAll graphs and result tables are saved in:")
+print(os.path.abspath(OUTPUT_FOLDER))
+
+print("\n" + "=" * 75)
+print("PROJECT EXECUTION COMPLETED SUCCESSFULLY")
+print("=" * 75)

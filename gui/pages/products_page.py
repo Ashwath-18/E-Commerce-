@@ -194,8 +194,10 @@ class ProductsPage(QWidget):
 
         if confirm_delete(self, f"product '{product_id}'"):
             try:
-                delete_product(product_id)
-                show_notification(self, "Product deleted.", "success")
+                if delete_product(product_id):
+                    show_notification(self, "Product deleted.", "success")
+                else:
+                    show_notification(self, "Product not found.", "warning")
                 self.selected_product = None
                 self.load_products(self.current_page)
             except Exception as e:

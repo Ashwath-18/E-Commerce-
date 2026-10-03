@@ -32,7 +32,9 @@ STOP_WORDS = {
 
 def _money_values(text):
     cleaned = text.replace(",", "")
-    values = [float(x) for x in re.findall(r"(?:₹|rs\.?|inr\s*)?\s*(\d+(?:\.\d+)?)", cleaned, re.I)]
+    # Digits glued to letters (e.g. product IDs like P13100) are not prices.
+    pattern = r"(?<![A-Za-z0-9])(?:₹|rs\.?|inr)?\s*(\d+(?:\.\d+)?)(?![A-Za-z0-9])"
+    values = [float(x) for x in re.findall(pattern, cleaned, re.I)]
     return [v for v in values if v >= 100]
 
 
@@ -120,6 +122,7 @@ def retrieve_products(message, limit=8, exclude_ids=None, price_mode=None):
     exclude_ids = set(exclude_ids or [])
     constraints = parse_constraints(message)
     query = _base_query(message)
+    tokens = _tokens(message)
 
     # Price follow-up modes are applied from the current context by the service.
     if price_mode:
@@ -141,14 +144,17 @@ def retrieve_products(message, limit=8, exclude_ids=None, price_mode=None):
         fallback = {}
         if constraints["min_price"] is not None or constraints["max_price"] is not None:
             price = {}
-            if constraints["min_price"] is not None: price["$gte"] = constraints["min_price"]
-            if constraints["max_price"] is not None: price["$lte"] = constraints["max_price"]
+            if constraints["min_price"] is not None:
+                price["$gte"] = constraints["min_price"]
+            if constraints["max_price"] is not None:
+                price["$lte"] = constraints["max_price"]
             fallback["final_price"] = price
         if constraints["min_rating"] is not None:
             fallback["rating"] = {"$gte": constraints["min_rating"]}
         for field in ("brand", "category", "subcategory"):
             named = _find_named(message, field)
-            if named: fallback[field] = {"$regex": f"^{re.escape(named)}$", "$options": "i"}
+            if named:
+                fallback[field] = {"$regex": f"^{re.escape(named)}$", "$options": "i"}
         if fallback:
             records = list(products.find(fallback, {"_id": 0}).sort([("rating", -1), ("review_count", -1)]).limit(limit))
         elif not tokens:
@@ -175,15 +181,19 @@ def find_by_context(message, context_products):
     for n, product in indexed:
         if re.search(rf"\b(?:the\s+)?{n}(?:st|nd|rd|th)?\s+(?:one|product)\b", text):
             return product, "indexed"
-    if re.search(r"\b(first|1st)\b", text): return indexed[0][1], "indexed"
-    if re.search(r"\b(second|2nd)\b", text) and len(indexed) >= 2: return indexed[1][1], "indexed"
-    if re.search(r"\b(third|3rd)\b", text) and len(indexed) >= 3: return indexed[2][1], "indexed"
-    if re.search(r"\b(this|that|it)\b", text): return indexed[0][1], "implicit"
+    if re.search(r"\b(first|1st)\b", text):
+        return indexed[0][1], "indexed"
+    if re.search(r"\b(second|2nd)\b", text) and len(indexed) >= 2:
+        return indexed[1][1], "indexed"
+    if re.search(r"\b(third|3rd)\b", text) and len(indexed) >= 3:
+        return indexed[2][1], "indexed"
+    if re.search(r"\b(this|that|it)\b", text):
+        return indexed[0][1], "implicit"
     return None, None
 
 
 def format_products(products_list: Iterable[dict]):
-    rows=[]
+    rows = []
     for p in products_list:
         rows.append({
             "product_id": p.get("product_id"),

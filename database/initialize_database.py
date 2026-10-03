@@ -6,20 +6,22 @@ This script performs the following steps:
 2. Creates indexes on important fields
 3. Imports the dataset into the database
 
-Run:
-    python database/initialize_database.py
+Run from the project root:
+    python -m database.initialize_database
 """
+
 from database.create_collections import create_collections
 from database.create_indexes import create_indexes
 from database.import_data import import_dataset
 from config.mongodb import db
 
-if db["Orders"].count_documents({}) > 0:
-    print("⚠️ Database already initialized.")
-    print("Run app.py instead.")
-    exit()
 
 def initialize_database():
+
+    if db["Orders"].count_documents({}) > 0:
+        print("⚠️ Database already initialized.")
+        print("Run app.py instead.")
+        return
 
     print("=" * 60)
     print(" CARTIFY DATABASE INITIALIZATION ")

@@ -5,6 +5,18 @@ from crud.delete import *
 from search.search import search_menu
 
 
+def _report(deleted, name):
+    print(f"{name} deleted successfully." if deleted else f"{name} not found.")
+
+
+def _safe(menu):
+    """Run a menu; show validation errors instead of crashing the CLI."""
+    try:
+        menu()
+    except (ValueError, TypeError) as exc:
+        print(f"Error: {exc}")
+
+
 def create_menu():
     while True:
         print("\n========== CREATE MENU ==========")
@@ -53,7 +65,7 @@ def create_menu():
         elif choice == "4":
             user_id = input("User ID: ")
             product_id = input("Product ID: ")
-            purchase_date = input("Purchase Date: ")
+            purchase_date = input("Purchase Date (YYYY-MM-DD): ")
             payment_method = input("Payment Method: ")
             shipping_time_days = int(input("Shipping Time (days): "))
             location = input("Location: ")
@@ -188,18 +200,18 @@ def delete_menu():
         choice = input("Enter choice: ")
 
         if choice == "1":
-            delete_user(input("User ID: "))
+            _report(delete_user(input("User ID: ")), "User")
 
         elif choice == "2":
-            delete_product(input("Product ID: "))
+            _report(delete_product(input("Product ID: ")), "Product")
 
         elif choice == "3":
-            delete_seller(input("Seller ID: "))
+            _report(delete_seller(input("Seller ID: ")), "Seller")
 
         elif choice == "4":
-            delete_order(
-                input("User ID: "),
-                input("Product ID: ")
+            _report(
+                delete_order(input("User ID: "), input("Product ID: ")),
+                "Order"
             )
 
         elif choice == "5":
@@ -224,16 +236,16 @@ def main():
         choice = input("Enter choice: ")
 
         if choice == "1":
-            create_menu()
+            _safe(create_menu)
 
         elif choice == "2":
-            read_menu()
+            _safe(read_menu)
 
         elif choice == "3":
-            update_menu()
+            _safe(update_menu)
 
         elif choice == "4":
-            delete_menu()
+            _safe(delete_menu)
 
         elif choice == "5":
             search_menu()

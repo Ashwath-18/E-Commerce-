@@ -8,7 +8,7 @@ def create_indexes():
         "Products": [
             ("product_id", True),
             ("brand", False),
-        ("category_id", False)
+            ("category", False)
         ],
 
         "Orders": [

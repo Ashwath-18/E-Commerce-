@@ -16,7 +16,9 @@ class Product:
         final_price,
         stock,
         rating,
-        review_count
+        review_count,
+        seller_id=None,
+        seller_rating=None
     ):
 
         self.product_id = product_id
@@ -29,6 +31,8 @@ class Product:
         self.stock = stock
         self.rating = rating
         self.review_count = review_count
+        self.seller_id = seller_id
+        self.seller_rating = seller_rating
 
     def to_dict(self):
         return {
@@ -41,7 +45,9 @@ class Product:
             "final_price": self.final_price,
             "stock": self.stock,
             "rating": self.rating,
-            "review_count": self.review_count
+            "review_count": self.review_count,
+            "seller_id": self.seller_id,
+            "seller_rating": self.seller_rating
         }
 
     def __str__(self):
