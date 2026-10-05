@@ -358,6 +358,24 @@ QPushButton#GlassButton:hover {
     border-radius: 18px;
 }
 
+#ReportKpiCard {
+    background-color: #151524;
+    border: 1px solid #303044;
+    border-radius: 14px;
+}
+
+#ReportKpiLabel {
+    color: #A5ADBD;
+    font-size: 11px;
+    font-weight: 700;
+}
+
+#ReportKpiValue {
+    color: #C4B5FD;
+    font-size: 23px;
+    font-weight: 800;
+}
+
 #DetailText {
     color: #F3F2FF;
     background-color: transparent;

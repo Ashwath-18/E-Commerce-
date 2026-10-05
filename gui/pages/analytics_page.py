@@ -1,422 +1,289 @@
-"""
-Analytics Page
-Dashboard-style analytics layout using live Cartify collection counts:
-a violet "flow" hero curve, a pink highlight card, a donut for the
-collection mix, progress bars and metric tiles.
-"""
+"""Separate chart-driven business reports for Cartify analytics."""
 
-from PySide6.QtCore import Qt, QRectF
-from PySide6.QtGui import QColor, QFont, QPainter, QPen
+from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
-    QFrame,
-    QGridLayout,
-    QHBoxLayout,
-    QLabel,
-    QProgressBar,
-    QPushButton,
-    QScrollArea,
-    QVBoxLayout,
-    QWidget,
+    QComboBox, QFrame, QGridLayout, QHBoxLayout, QLabel, QPushButton,
+    QScrollArea, QStackedWidget, QVBoxLayout, QWidget,
 )
 
-from config.mongodb import db
-from database.dashboard_stats import (
-    total_orders,
-    total_products,
-    total_reviews,
-    total_users,
+from database.analytics_service import AnalyticsService
+from gui.widgets.report_charts import (
+    ChartPanel, DonutChart, HorizontalBarChart, RatingGauge, VerticalBarChart,
 )
-from gui.styles import colors
-from gui.widgets import icons
-from gui.widgets.chart_card import AreaChart
-from gui.widgets.notification import show_notification
-from gui.widgets.page_header import PageHeader
 
 
-CORE_COLLECTIONS = ["Products", "Users", "Orders", "Reviews"]
-SUPPORT_COLLECTIONS = ["Shipping", "Payments", "Inventory", "Sellers"]
+REPORTS = [
+    ("sales", "Sales Report", "Track sales performance, order value, and fulfilment results."),
+    ("inventory", "Inventory Report", "Monitor product availability and stock health."),
+    ("customer", "Customer Report", "Understand customer activity and purchasing behaviour."),
+    ("seller", "Seller Report", "Compare seller performance and ratings."),
+    ("review", "Review Report", "Summarize category ratings and customer feedback quality."),
+    ("payment", "Payment Report", "Review how customers choose to pay for orders."),
+]
 
-# palette keys used for each core collection (ring + legend dots)
-SEGMENT_KEYS = ["PRIMARY", "PINK_B", "AMBER_A", "SUCCESS"]
 
-
-class _Dot(QWidget):
-    """Small legend dot that follows the active theme."""
-
-    def __init__(self, key, parent=None):
+class ReportKpiCard(QFrame):
+    def __init__(self, title, value, parent=None):
         super().__init__(parent)
-        self._key = key
-        self.setFixedSize(12, 12)
-
-    def paintEvent(self, event):
-        painter = QPainter(self)
-        painter.setRenderHint(QPainter.Antialiasing)
-        painter.setPen(Qt.NoPen)
-        painter.setBrush(QColor(colors.CURRENT[self._key]))
-        painter.drawEllipse(QRectF(1, 1, 10, 10))
-
-
-class _RingChart(QWidget):
-    """Donut chart for the live collection mix."""
-
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        self.values = []
-        self.setMinimumSize(190, 190)
-
-    def set_values(self, values):
-        self.values = [max(int(value or 0), 0) for value in values]
-        self.update()
-
-    def paintEvent(self, event):
-        palette = colors.CURRENT
-        painter = QPainter(self)
-        painter.setRenderHint(QPainter.Antialiasing)
-
-        thickness = 18
-        rect_size = min(self.width(), self.height()) - 36
-        rect = QRectF(
-            (self.width() - rect_size) / 2,
-            (self.height() - rect_size) / 2,
-            rect_size,
-            rect_size,
-        )
-
-        painter.setPen(QPen(QColor(palette["TRACK"]), thickness, Qt.SolidLine, Qt.FlatCap))
-        painter.drawArc(rect, 0, 360 * 16)
-
-        total = sum(self.values)
-        if total:
-            start_angle = 90 * 16
-            gap = 4 * 16 if sum(1 for v in self.values if v) > 1 else 0
-            for index, value in enumerate(self.values):
-                if not value:
-                    continue
-                span = int(-(value / total) * 360 * 16)
-                color = QColor(palette[SEGMENT_KEYS[index % len(SEGMENT_KEYS)]])
-                painter.setPen(QPen(color, thickness, Qt.SolidLine, Qt.RoundCap))
-                painter.drawArc(rect, start_angle - gap // 2, span + gap)
-                start_angle += span
-
-        painter.setPen(QColor(palette["TEXT"]))
-        painter.setFont(QFont(colors.FONT_FAMILY, 20, QFont.Bold))
-        painter.drawText(self.rect().adjusted(0, -8, 0, 0), Qt.AlignCenter, f"{total:,}")
-
-        painter.setPen(QColor(palette["TEXT_LIGHT"]))
-        painter.setFont(QFont(colors.FONT_FAMILY, 10, QFont.DemiBold))
-        painter.drawText(self.rect().adjusted(0, 40, 0, 0), Qt.AlignCenter, "records")
+        self.setObjectName("ReportKpiCard")
+        self.setMinimumHeight(118)
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(20, 18, 20, 18)
+        layout.setSpacing(7)
+        label = QLabel(title.upper())
+        label.setObjectName("ReportKpiLabel")
+        number = QLabel(str(value))
+        number.setObjectName("ReportKpiValue")
+        number.setWordWrap(True)
+        layout.addWidget(label)
+        layout.addWidget(number)
+        layout.addStretch()
 
 
 class AnalyticsPage(QWidget):
+    """A report chooser with isolated, refreshable report pages."""
 
     def __init__(self, parent=None):
         super().__init__(parent)
+        self.service = AnalyticsService()
+        self.report_pages = {}
+        self.report_layouts = {}
+        self._build_ui()
 
-        outer_layout = QVBoxLayout(self)
-        outer_layout.setContentsMargins(0, 0, 0, 0)
-        outer_layout.setSpacing(0)
+    def _build_ui(self):
+        root = QVBoxLayout(self)
+        root.setContentsMargins(0, 0, 0, 0)
+        self.stack = QStackedWidget()
+        root.addWidget(self.stack)
 
-        scroll_area = QScrollArea()
-        scroll_area.setWidgetResizable(True)
-        scroll_area.setFrameShape(QFrame.NoFrame)
-        scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-        scroll_area.viewport().setAutoFillBackground(False)
-        outer_layout.addWidget(scroll_area)
+        self.hub_page = self._create_hub_page()
+        self.stack.addWidget(self.hub_page)
+        for report in REPORTS:
+            page = self._create_report_page(report)
+            self.report_pages[report[0]] = page
+            self.stack.addWidget(page)
 
-        content = QWidget()
-        scroll_area.setWidget(content)
+    def _create_hub_page(self):
+        page = QWidget()
+        layout = QVBoxLayout(page)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(16)
+        title = QLabel("Analytics Reports")
+        title.setObjectName("PageTitle")
+        subtitle = QLabel("Choose a report to view its live database metrics and charts.")
+        subtitle.setObjectName("PageSubtitle")
+        layout.addWidget(title)
+        layout.addWidget(subtitle)
 
-        layout = QVBoxLayout(content)
-        layout.setContentsMargins(4, 4, 8, 20)
-        layout.setSpacing(18)
-
-        header = PageHeader(
-            "Analytics",
-            "Live Cartify metrics arranged for quick operational insight.",
-            "analytics",
-        )
-        refresh_btn = QPushButton("Refresh")
-        refresh_btn.setObjectName("SecondaryButton")
-        refresh_btn.setCursor(Qt.PointingHandCursor)
-        icons.bind(refresh_btn, "refresh", 18, "muted", "primary")
-        refresh_btn.clicked.connect(self.refresh)
-        header.add_action(refresh_btn)
-        layout.addWidget(header)
+        selector_row = QHBoxLayout()
+        selector_label = QLabel("Report Section")
+        selector_label.setObjectName("PanelLabel")
+        self.report_picker = QComboBox()
+        self.report_picker.setMinimumWidth(270)
+        self.report_picker.addItem("Choose a report…", None)
+        for key, title_text, _ in REPORTS:
+            self.report_picker.addItem(title_text, key)
+        open_button = QPushButton("Open Report")
+        open_button.setObjectName("PrimaryButton")
+        open_button.setCursor(Qt.PointingHandCursor)
+        open_button.clicked.connect(self._open_selected_report)
+        selector_row.addWidget(selector_label)
+        selector_row.addWidget(self.report_picker)
+        selector_row.addWidget(open_button)
+        selector_row.addStretch()
+        layout.addLayout(selector_row)
 
         grid = QGridLayout()
-        grid.setHorizontalSpacing(18)
-        grid.setVerticalSpacing(18)
-        grid.setColumnStretch(0, 2)
-        grid.setColumnStretch(1, 2)
-        grid.setColumnStretch(2, 2)
+        grid.setHorizontalSpacing(16)
+        grid.setVerticalSpacing(16)
+        for index, report in enumerate(REPORTS):
+            grid.addWidget(self._create_report_card(report), index // 2, index % 2)
+        layout.addLayout(grid)
+        layout.addStretch()
+        return page
 
-        self.mix_ring = _RingChart()
-        self.mix_labels = {}
-        grid.addWidget(self._build_mix_card(), 0, 0, 2, 1)
-
-        self.progress_bars = {}
-        grid.addWidget(self._build_progress_card(), 0, 1, 1, 1)
-
-        self.support_labels = {}
-        grid.addWidget(self._build_support_card(), 1, 1, 1, 1)
-
-        self.sparkline = AreaChart(on_gradient=True, caption="records", min_height=150)
-        self.flow_total = QLabel("0")
-        self.flow_total.setObjectName("HeroKpiValue")
-        grid.addWidget(self._build_flow_card(), 0, 2, 1, 1)
-
-        self.highlight_title = QLabel("Largest Dataset")
-        self.highlight_title.setObjectName("AccentTitle")
-        self.highlight_value = QLabel("0")
-        self.highlight_value.setObjectName("AccentValue")
-        self.highlight_note = QLabel("Waiting for live data.")
-        self.highlight_note.setObjectName("AccentSub")
-        grid.addWidget(
-            self._build_text_card(
-                self.highlight_title, self.highlight_value, self.highlight_note,
-                frame_name="AccentCardPink",
-            ),
-            1, 2, 1, 1,
-        )
-
-        self.stat_tiles = {}
-        grid.addWidget(self._build_tile_grid(), 2, 0, 1, 2)
-
-        self.balance_title = QLabel("Data Balance")
-        self.balance_title.setObjectName("ChartTitle")
-        self.balance_value = QLabel("0%")
-        self.balance_value.setObjectName("StatValue")
-        self.balance_note = QLabel("Compares reviews against products.")
-        self.balance_note.setObjectName("PageSubtitle")
-        grid.addWidget(
-            self._build_text_card(
-                self.balance_title, self.balance_value, self.balance_note
-            ),
-            2, 2, 1, 1,
-        )
-
-        layout.addLayout(grid, stretch=1)
-        self.refresh()
-
-    # ---------------- Builders ----------------
-
-    def _card(self, title, subtitle=None):
+    def _create_report_card(self, report):
+        key, title_text, description = report
         card = QFrame()
         card.setObjectName("Card")
+        card.setMinimumHeight(150)
         layout = QVBoxLayout(card)
         layout.setContentsMargins(22, 20, 22, 20)
-        layout.setSpacing(12)
-
-        title_label = QLabel(title)
-        title_label.setObjectName("ChartTitle")
-        layout.addWidget(title_label)
-        if subtitle:
-            sub = QLabel(subtitle)
-            sub.setObjectName("ChartSub")
-            layout.addWidget(sub)
-        return card, layout
-
-    def _value_row(self, text, dot_key=None):
-        row = QHBoxLayout()
-        row.setSpacing(10)
-        if dot_key:
-            row.addWidget(_Dot(dot_key))
-        label = QLabel(text)
-        label.setObjectName("PanelLabel")
-        value = QLabel("0")
-        value.setObjectName("PanelValue")
-        row.addWidget(label)
-        row.addStretch()
-        row.addWidget(value)
-        return row, value
-
-    def _build_mix_card(self):
-        card, layout = self._card("Collection Mix", "Core records by collection")
-        layout.addWidget(self.mix_ring, alignment=Qt.AlignCenter)
-
-        for index, name in enumerate(CORE_COLLECTIONS):
-            row, value = self._value_row(name, SEGMENT_KEYS[index])
-            layout.addLayout(row)
-            self.mix_labels[name] = value
-
-        layout.addStretch()
-        return card
-
-    def _build_progress_card(self):
-        card, layout = self._card("Operational Pulse")
-        progress_items = [
-            ("Order Depth", "Orders", "Products"),
-            ("Customer Activity", "Orders", "Users"),
-            ("Review Coverage", "Reviews", "Products"),
-        ]
-
-        for title, numerator, denominator in progress_items:
-            label_row = QHBoxLayout()
-            label = QLabel(title)
-            label.setObjectName("PanelLabel")
-            value = QLabel("0%")
-            value.setObjectName("PanelValue")
-            label_row.addWidget(label)
-            label_row.addStretch()
-            label_row.addWidget(value)
-
-            bar = QProgressBar()
-            bar.setRange(0, 100)
-            bar.setTextVisible(False)
-
-            layout.addLayout(label_row)
-            layout.addWidget(bar)
-            self.progress_bars[title] = (bar, value, numerator, denominator)
-
-        layout.addStretch()
-        return card
-
-    def _build_support_card(self):
-        card, layout = self._card("Support Collections")
-
-        for name in SUPPORT_COLLECTIONS:
-            row, value = self._value_row(name)
-            layout.addLayout(row)
-            self.support_labels[name] = value
-
-        layout.addStretch()
-        return card
-
-    def _build_flow_card(self):
-        card = QFrame()
-        card.setObjectName("HeroCard")
-        layout = QVBoxLayout(card)
-        layout.setContentsMargins(24, 20, 24, 20)
-        layout.setSpacing(6)
-
-        title = QLabel("Cartify Flow")
-        title.setObjectName("HeroTitle")
-        sub = QLabel("Core records at a glance")
-        sub.setObjectName("HeroSub")
+        title = QLabel(title_text)
+        title.setObjectName("ChartTitle")
+        text = QLabel(description)
+        text.setObjectName("PageSubtitle")
+        text.setWordWrap(True)
+        button = QPushButton("View Report")
+        button.setObjectName("SecondaryButton")
+        button.setCursor(Qt.PointingHandCursor)
+        button.clicked.connect(lambda checked=False, report_key=key: self.open_report(report_key))
         layout.addWidget(title)
-        layout.addWidget(sub)
-        layout.addWidget(self.sparkline, stretch=1)
-
-        row = QHBoxLayout()
-        row.addWidget(self.flow_total)
-        row.addStretch()
-        note = QLabel("total core records")
-        note.setObjectName("HeroSub")
-        row.addWidget(note, alignment=Qt.AlignBottom)
-        layout.addLayout(row)
-        return card
-
-    def _build_text_card(self, title, value, note, frame_name="Card"):
-        card = QFrame()
-        card.setObjectName(frame_name)
-        layout = QVBoxLayout(card)
-        layout.setContentsMargins(24, 20, 24, 20)
-        layout.setSpacing(6)
-        layout.addWidget(title)
+        layout.addWidget(text)
         layout.addStretch()
-        layout.addWidget(value)
-        note.setWordWrap(True)
-        layout.addWidget(note)
+        layout.addWidget(button, alignment=Qt.AlignLeft)
         return card
 
-    def _build_tile_grid(self):
-        card, layout = self._card("Core Metrics", "Live totals from the database")
+    def _create_report_page(self, report):
+        key, title_text, description = report
+        page = QWidget()
+        layout = QVBoxLayout(page)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(16)
 
-        grid = QGridLayout()
-        grid.setHorizontalSpacing(12)
-        grid.setVerticalSpacing(12)
+        header = QHBoxLayout()
+        title_block = QVBoxLayout()
+        title = QLabel(title_text)
+        title.setObjectName("PageTitle")
+        subtitle = QLabel(description)
+        subtitle.setObjectName("PageSubtitle")
+        title_block.addWidget(title)
+        title_block.addWidget(subtitle)
+        refresh_button = QPushButton("Refresh Report")
+        refresh_button.setObjectName("SecondaryButton")
+        refresh_button.setCursor(Qt.PointingHandCursor)
+        refresh_button.clicked.connect(lambda checked=False, report_key=key: self.refresh_report(report_key))
+        back_button = QPushButton("← All Reports")
+        back_button.setObjectName("SecondaryButton")
+        back_button.setCursor(Qt.PointingHandCursor)
+        back_button.clicked.connect(self.show_report_hub)
+        header.addLayout(title_block)
+        header.addStretch()
+        header.addWidget(refresh_button)
+        header.addWidget(back_button)
+        layout.addLayout(header)
 
-        glyphs = {"Products": "products", "Users": "users",
-                  "Orders": "orders", "Reviews": "reviews"}
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.NoFrame)
+        content = QWidget()
+        content_layout = QVBoxLayout(content)
+        content_layout.setContentsMargins(0, 0, 0, 0)
+        content_layout.setSpacing(16)
+        scroll.setWidget(content)
+        layout.addWidget(scroll)
+        self.report_layouts[key] = content_layout
+        return page
 
-        for index, name in enumerate(CORE_COLLECTIONS):
-            tile = QFrame()
-            tile.setObjectName("MetricTile")
-            tile_layout = QHBoxLayout(tile)
-            tile_layout.setContentsMargins(16, 14, 16, 14)
-            tile_layout.setSpacing(14)
-            tile.setMinimumHeight(92)
+    def _clear_layout(self, layout):
+        while layout.count():
+            item = layout.takeAt(0)
+            if item.widget():
+                item.widget().deleteLater()
+            elif item.layout():
+                self._clear_layout(item.layout())
 
-            tile_layout.addWidget(icons.IconBadge(glyphs[name], 46, "violet"))
+    @staticmethod
+    def _currency(value):
+        return f"₹{value:,.2f}"
 
-            col = QVBoxLayout()
-            col.setSpacing(0)
-            label = QLabel(name)
-            label.setObjectName("PanelLabel")
-            value = QLabel("0")
-            value.setObjectName("TileValue")
-            col.addStretch()
-            col.addWidget(label)
-            col.addWidget(value)
-            col.addStretch()
-            tile_layout.addLayout(col)
-            tile_layout.addStretch()
+    @staticmethod
+    def _kpi_row(*cards):
+        row = QHBoxLayout()
+        row.setSpacing(16)
+        for card in cards:
+            row.addWidget(card)
+        return row
 
-            row, column = divmod(index, 2)
-            grid.addWidget(tile, row, column)
-            self.stat_tiles[name] = value
+    def _add_error(self, layout, error):
+        card = QFrame()
+        card.setObjectName("Card")
+        card_layout = QVBoxLayout(card)
+        label = QLabel(f"Could not load this report: {error}")
+        label.setObjectName("PageSubtitle")
+        label.setWordWrap(True)
+        card_layout.addWidget(label)
+        layout.addWidget(card)
 
-        layout.addLayout(grid)
-        return card
-
-    # ---------------- Data ----------------
-
-    def refresh(self):
+    def refresh_report(self, key):
+        layout = self.report_layouts[key]
+        self._clear_layout(layout)
         try:
-            core_counts = {
-                "Products": total_products(),
-                "Users": total_users(),
-                "Orders": total_orders(),
-                "Reviews": total_reviews(),
-            }
-            support_counts = {
-                name: db[name].count_documents({})
-                for name in SUPPORT_COLLECTIONS
-            }
-        except Exception as e:
-            show_notification(self, f"Could not load analytics: {e}", "error")
-            return
+            getattr(self, f"_build_{key}_report")(layout)
+        except Exception as error:
+            self._add_error(layout, error)
+        layout.addStretch()
 
-        self._update_core_counts(core_counts)
-        self._update_support_counts(support_counts)
-        self._update_progress(core_counts)
-        self._update_highlights(core_counts)
+    def _build_sales_report(self, layout):
+        data = self.service.get_sales_report()
+        layout.addLayout(self._kpi_row(
+            ReportKpiCard("Total Orders", f"{data['total_orders']:,}"),
+            ReportKpiCard("Total Revenue", self._currency(data["total_revenue"])),
+            ReportKpiCard("Average Order Value", self._currency(data["average_order_value"])),
+            ReportKpiCard("Top Selling Category", data["top_category"]),
+        ))
+        charts = QHBoxLayout()
+        charts.setSpacing(16)
+        charts.addWidget(ChartPanel("Top Selling Categories", HorizontalBarChart(data["categories"])))
+        charts.addWidget(ChartPanel("Returned vs Delivered Orders", DonutChart(data["status"])))
+        layout.addLayout(charts)
 
-    def _update_core_counts(self, counts):
-        values = [counts[name] for name in CORE_COLLECTIONS]
-        self.mix_ring.set_values(values)
-        self.sparkline.set_data([(name, counts[name]) for name in CORE_COLLECTIONS])
-        self.flow_total.setText(f"{sum(values):,}")
+    def _build_inventory_report(self, layout):
+        data = self.service.get_inventory_report()
+        layout.addLayout(self._kpi_row(
+            ReportKpiCard("Products", f"{data['products']:,}"),
+            ReportKpiCard("Out of Stock", f"{data['out_of_stock']:,}"),
+            ReportKpiCard("Low Stock", f"{data['low_stock']:,}"),
+            ReportKpiCard("Average Stock", f"{data['average_stock']:.1f}"),
+        ))
+        inventory_colors = ["#DC2626", "#F59E0B", "#16A34A"]  # out, low, healthy
+        layout.addWidget(ChartPanel(
+            "Inventory Status Overview",
+            DonutChart(data["status"], chart_colors=inventory_colors),
+        ))
 
-        for name, value in counts.items():
-            formatted = f"{value:,}"
-            self.mix_labels[name].setText(formatted)
-            self.stat_tiles[name].setText(formatted)
+    def _build_customer_report(self, layout):
+        data = self.service.get_customer_report()
+        layout.addLayout(self._kpi_row(
+            ReportKpiCard("Total Users", f"{data['total_users']:,}"),
+            ReportKpiCard("Most Active User", data["most_active_user"]),
+            ReportKpiCard("Top Buyer", data["top_buyer"]),
+        ))
+        charts = QHBoxLayout()
+        charts.setSpacing(16)
+        charts.addWidget(ChartPanel("Most Active Users by Orders", HorizontalBarChart(data["activity"])))
+        charts.addWidget(ChartPanel("Top Buyers by Spend", HorizontalBarChart(data["buyers"], currency=True)))
+        layout.addLayout(charts)
 
-    def _update_support_counts(self, counts):
-        for name, value in counts.items():
-            self.support_labels[name].setText(f"{value:,}")
+    def _build_seller_report(self, layout):
+        data = self.service.get_seller_report()
+        layout.addLayout(self._kpi_row(ReportKpiCard("Average Seller Rating", f"{data['average_rating']:.2f} / 5")))
+        charts = QHBoxLayout()
+        charts.setSpacing(16)
+        charts.addWidget(ChartPanel("Random Sellers", HorizontalBarChart(data["sellers"])))
+        charts.addWidget(ChartPanel("Seller Rating Comparison", VerticalBarChart(data["sellers"], max_value=5)))
+        layout.addLayout(charts)
 
-    def _update_progress(self, counts):
-        for bar, label, numerator_name, denominator_name in self.progress_bars.values():
-            numerator = counts.get(numerator_name, 0)
-            denominator = counts.get(denominator_name, 0)
-            percent = int(min((numerator / denominator) * 100, 100)) if denominator else 0
-            bar.setValue(percent)
-            label.setText(f"{percent}%")
+    def _build_review_report(self, layout):
+        data = self.service.get_review_report()
+        highest_product = data["highest"][0][0] if data["highest"] else "N/A"
+        lowest_product = data["lowest"][0][0] if data["lowest"] else "N/A"
+        layout.addLayout(self._kpi_row(
+            ReportKpiCard("Highest Rated Category", highest_product),
+            ReportKpiCard("Lowest Rated Category", lowest_product),
+            ReportKpiCard("Average Rating", f"{data['average_rating']:.2f} / 5"),
+        ))
+        charts = QHBoxLayout()
+        charts.setSpacing(16)
+        charts.addWidget(ChartPanel("Highest Rated Categories", HorizontalBarChart(data["highest"])))
+        charts.addWidget(ChartPanel("Lowest Rated Categories", HorizontalBarChart(data["lowest"])))
+        layout.addLayout(charts)
+        layout.addWidget(ChartPanel("Average Rating", RatingGauge(data["average_rating"])))
 
-    def _update_highlights(self, counts):
-        largest_name, largest_value = max(counts.items(), key=lambda item: item[1])
-        self.highlight_title.setText("Largest Dataset")
-        self.highlight_value.setText(f"{largest_value:,}")
-        self.highlight_note.setText(f"{largest_name} currently has the highest record count.")
+    def _build_payment_report(self, layout):
+        data = self.service.get_payment_report()
+        layout.addLayout(self._kpi_row(*[ReportKpiCard(name, f"{value:,}") for name, value in data]))
+        layout.addWidget(ChartPanel("Payment Method Distribution", DonutChart(data)))
 
-        products = counts.get("Products", 0)
-        reviews = counts.get("Reviews", 0)
-        coverage = int(min((reviews / products) * 100, 100)) if products else 0
-        self.balance_value.setText(f"{coverage}%")
-        self.balance_note.setText("Review coverage compared with the live product catalog.")
+    def _open_selected_report(self):
+        key = self.report_picker.currentData()
+        if key:
+            self.open_report(key)
 
-    def showEvent(self, event):
-        super().showEvent(event)
-        self.refresh()
+    def open_report(self, key):
+        self.refresh_report(key)
+        self.stack.setCurrentWidget(self.report_pages[key])
+
+    def show_report_hub(self):
+        self.report_picker.setCurrentIndex(0)
+        self.stack.setCurrentWidget(self.hub_page)
