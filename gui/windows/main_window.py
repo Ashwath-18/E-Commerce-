@@ -1,8 +1,9 @@
 """
 Main Window
-Combines Sidebar (left nav) + Navbar (top header) + a QStackedWidget
-holding every page. Applies theme-aware drop-shadows, and keeps
-the Navbar/Sidebar logo in sync with the active theme.
+Lavender canvas -> rounded shell holding: floating Sidebar (left) and a
+column with the Navbar (header) + a QStackedWidget holding every page.
+Applies theme-aware drop-shadows / glows and keeps the logo, header icons
+and shadows in sync with the active theme.
 """
 
 import os
@@ -15,7 +16,7 @@ from PySide6.QtCore import Qt
 
 from gui.widgets.sidebar import Sidebar
 from gui.widgets.navbar import Navbar
-from gui.styles import apply_theme
+from gui.styles import apply_theme, colors
 
 from gui.pages.dashboard_page import DashboardPage
 from gui.pages.products_page import ProductsPage
@@ -28,7 +29,21 @@ from gui.pages.ai_page import AIAssistantPage
 from gui.pages.analytics_page import AnalyticsPage
 from gui.pages.settings_page import SettingsPage
 
-SHADOW_OBJECT_NAMES = {"Card", "StatCard", "ChartCard", "Navbar"}
+SHADOW_OBJECT_NAMES = {"Card", "StatCard", "ChartCard", "FilterBar"}
+HERO_SHADOW_OBJECT_NAMES = {"HeroCard", "AccentCardViolet", "AccentCardPink"}
+
+PAGE_TITLES = {
+    "dashboard": "Dashboard",
+    "products": "Products",
+    "orders": "Orders",
+    "shipping": "Shipping",
+    "users": "Users",
+    "reviews": "Reviews",
+    "search": "Search",
+    "ai": "AI Assistant",
+    "analytics": "Analytics",
+    "settings": "Settings",
+}
 
 
 class MainWindow(QMainWindow):
@@ -41,21 +56,29 @@ class MainWindow(QMainWindow):
         self._logging_out = False
 
         self.setWindowTitle("Cartify")
-        self.resize(1500, 850)
+        self.resize(1500, 880)
         self.setMinimumSize(1120, 700)
 
         self.asset_path = os.path.join(
             os.path.dirname(os.path.dirname(__file__)), "assets"
         )
 
-        # ---------------- Central Layout ----------------
+        # ---------------- Canvas + Shell ----------------
 
-        central = QWidget()
-        self.setCentralWidget(central)
+        canvas = QFrame()
+        canvas.setObjectName("Canvas")
+        self.setCentralWidget(canvas)
 
-        root_layout = QHBoxLayout(central)
-        root_layout.setContentsMargins(0, 0, 0, 0)
-        root_layout.setSpacing(0)
+        canvas_layout = QVBoxLayout(canvas)
+        canvas_layout.setContentsMargins(18, 18, 18, 18)
+
+        shell = QFrame()
+        shell.setObjectName("Shell")
+        canvas_layout.addWidget(shell)
+
+        root_layout = QHBoxLayout(shell)
+        root_layout.setContentsMargins(14, 14, 14, 14)
+        root_layout.setSpacing(16)
 
         # ---------------- Sidebar ----------------
 
@@ -67,11 +90,12 @@ class MainWindow(QMainWindow):
         # ---------------- Main Column ----------------
 
         main_column = QVBoxLayout()
-        main_column.setContentsMargins(24, 22, 24, 22)
-        main_column.setSpacing(20)
+        main_column.setContentsMargins(0, 0, 10, 0)
+        main_column.setSpacing(12)
 
         self.navbar = Navbar(self.asset_path)
         self.navbar.set_admin_name(admin_name)
+        self.navbar.theme_toggle_requested.connect(self._toggle_theme)
         main_column.addWidget(self.navbar)
 
         self.stack = QStackedWidget()
@@ -86,7 +110,7 @@ class MainWindow(QMainWindow):
         self.pages = {}
 
         self.dashboard_page = DashboardPage()
-        self.dashboard_page.page_requested.connect(self.show_page)
+        self.dashboard_page.page_requested.connect(self.sidebar.select)
         self.products_page = ProductsPage()
         self.orders_page = OrdersPage()
         self.shipping_page = ShippingPage()
@@ -116,6 +140,7 @@ class MainWindow(QMainWindow):
             self.pages[key] = widget
             self.stack.addWidget(widget)
 
+        self.navbar.set_theme(self.current_theme)
         self.show_page("dashboard")
 
         self._apply_shadows()
@@ -124,12 +149,16 @@ class MainWindow(QMainWindow):
         page = self.pages.get(page_key)
         if page:
             self.stack.setCurrentWidget(page)
+            self.navbar.set_page_title(PAGE_TITLES.get(page_key, page_key.title()))
+
+    def _toggle_theme(self):
+        self.apply_theme("light" if self.current_theme == "dark" else "dark")
 
     def apply_theme(self, theme):
         self.current_theme = theme
         apply_theme(self.app, theme)
 
-        # Keep branding (logo) and shadows in sync with the new theme
+        # Keep branding (logo), header icons and shadows in sync
         self.navbar.set_theme(theme)
         self.sidebar.set_theme(theme)
         self.settings_page.set_theme(theme)
@@ -137,20 +166,29 @@ class MainWindow(QMainWindow):
 
     def _apply_shadows(self):
         """
-        Light theme -> subtle neutral shadow.
-        Dark theme  -> restrained violet shadow that remains visible
-        on dark surfaces.
+        Light theme -> soft violet-tinted shadow.
+        Dark theme  -> restrained violet glow that stays visible on
+        deep indigo surfaces. Hero / accent cards get a stronger glow.
         """
-        is_dark = self.current_theme == "dark"
-        shadow_color = QColor(130, 110, 255, 24) if is_dark else QColor(15, 23, 42, 28)
+        palette = colors.CURRENT
+        soft = QColor(*palette["SHADOW"])
+        hero = QColor(*palette["SHADOW_HERO"])
 
         for frame in self.findChildren(QFrame):
-            if frame.objectName() in SHADOW_OBJECT_NAMES:
+            name = frame.objectName()
+            if name in SHADOW_OBJECT_NAMES:
                 effect = QGraphicsDropShadowEffect(frame)
-                effect.setBlurRadius(28)
+                effect.setBlurRadius(30)
                 effect.setXOffset(0)
-                effect.setYOffset(8 if not is_dark else 0)
-                effect.setColor(shadow_color)
+                effect.setYOffset(8)
+                effect.setColor(soft)
+                frame.setGraphicsEffect(effect)
+            elif name in HERO_SHADOW_OBJECT_NAMES:
+                effect = QGraphicsDropShadowEffect(frame)
+                effect.setBlurRadius(38)
+                effect.setXOffset(0)
+                effect.setYOffset(14)
+                effect.setColor(hero)
                 frame.setGraphicsEffect(effect)
 
     def closeEvent(self, event):

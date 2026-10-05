@@ -3,16 +3,16 @@ Users Page
 Table of users with add / delete, wired to crud/.
 """
 
-from PySide6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QFrame
-)
+from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QPushButton
 from PySide6.QtCore import Qt
 
+from gui.widgets import icons
 from gui.widgets.search_bar import SearchBar
 from gui.widgets.sort_button import SortButton
 from gui.widgets.table import DataTable
 from gui.widgets.notification import show_notification
 from gui.widgets.pagination import PaginationControls
+from gui.widgets.page_header import PageHeader, FilterBar, make_table_card
 from gui.dialogs.add_user_dialog import AddUserDialog
 from gui.dialogs.delete_dialog import confirm_delete
 
@@ -38,53 +38,36 @@ class UsersPage(QWidget):
         self.current_page = 1
 
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setContentsMargins(4, 4, 8, 8)
         layout.setSpacing(16)
 
-        header_row = QHBoxLayout()
+        header = PageHeader("Users", "Manage registered users.", "users")
 
-        title_block = QVBoxLayout()
-        title = QLabel("Users")
-        title.setObjectName("PageTitle")
-        subtitle = QLabel("Manage registered users.")
-        subtitle.setObjectName("PageSubtitle")
-        title_block.addWidget(title)
-        title_block.addWidget(subtitle)
-
-        header_row.addLayout(title_block)
-        header_row.addStretch()
-
-        add_btn = QPushButton("+ Add User")
+        add_btn = QPushButton("Add User")
         add_btn.setObjectName("PrimaryButton")
         add_btn.setCursor(Qt.PointingHandCursor)
+        icons.bind(add_btn, "plus", 18, "white")
         add_btn.clicked.connect(self._add_user)
-
-        header_row.addWidget(add_btn)
-        layout.addLayout(header_row)
+        header.add_action(add_btn)
+        layout.addWidget(header)
 
         self.search_bar = SearchBar(placeholder="Search by User ID...")
         self.search_bar.search_triggered.connect(self._search)
-        self.search_bar.setMaximumWidth(780)
 
         self.sort_button = SortButton(SORT_OPTIONS)
         self.sort_button.sort_requested.connect(self._sort)
 
-        search_row = QHBoxLayout()
-        search_row.addWidget(self.search_bar)
-        search_row.addWidget(self.sort_button)
-        search_row.addStretch()
-        layout.addLayout(search_row)
-
-        table_card = QFrame()
-        table_card.setObjectName("Card")
-        table_layout = QVBoxLayout(table_card)
-        table_layout.setContentsMargins(12, 12, 12, 12)
+        filters = FilterBar()
+        filters.row.addWidget(self.search_bar, stretch=1)
+        filters.row.addWidget(self.sort_button)
+        layout.addWidget(filters)
 
         self.table = DataTable(COLUMNS)
+        self.table.set_empty_message(
+            "No users found", "Try a different User ID, or add a new user."
+        )
         self.table.row_selected.connect(self._on_row_selected)
-        table_layout.addWidget(self.table)
-
-        layout.addWidget(table_card, stretch=1)
+        layout.addWidget(make_table_card(self.table), stretch=1)
 
         self.pagination = PaginationControls(PAGE_SIZE)
         self.pagination.page_changed.connect(self.load_users)
@@ -96,6 +79,7 @@ class UsersPage(QWidget):
         delete_btn = QPushButton("Delete Selected")
         delete_btn.setObjectName("DangerButton")
         delete_btn.setCursor(Qt.PointingHandCursor)
+        icons.bind(delete_btn, "trash", 18, "white")
         delete_btn.clicked.connect(self._delete_user)
 
         action_row.addWidget(delete_btn)

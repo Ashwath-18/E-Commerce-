@@ -8,13 +8,15 @@ here to keep the app from crashing on that page.
 """
 
 from PySide6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QComboBox,
+    QWidget, QVBoxLayout, QComboBox,
     QLineEdit, QPushButton, QFrame, QScrollArea
 )
 from PySide6.QtCore import Qt
-from html import escape
 
+from gui.widgets import icons
 from gui.widgets.table import DataTable
+from gui.widgets.detail_panel import DetailPanel
+from gui.widgets.page_header import PageHeader, FilterBar, make_table_card
 from gui.widgets.notification import show_notification
 from gui.widgets.sort_button import SortButton
 from gui.widgets.pagination import PaginationControls
@@ -82,28 +84,27 @@ class SearchPage(QWidget):
         self.scroll_area.setWidgetResizable(True)
         self.scroll_area.setFrameShape(QFrame.NoFrame)
         self.scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self.scroll_area.viewport().setAutoFillBackground(False)
 
         content = QWidget()
         self.scroll_area.setWidget(content)
         outer_layout.addWidget(self.scroll_area)
 
         layout = QVBoxLayout(content)
-        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setContentsMargins(4, 4, 8, 16)
         layout.setSpacing(16)
 
-        title = QLabel("Search & Filter")
-        title.setObjectName("PageTitle")
-        subtitle = QLabel("Look up products, orders, and sellers.")
-        subtitle.setObjectName("PageSubtitle")
-
-        layout.addWidget(title)
-        layout.addWidget(subtitle)
+        layout.addWidget(
+            PageHeader(
+                "Search & Filter", "Look up products, orders, and sellers.", "search"
+            )
+        )
 
         # ---------------- Controls ----------------
 
-        controls_row = QHBoxLayout()
-
         self.mode_dropdown = QComboBox()
+        self.mode_dropdown.setMinimumHeight(46)
+        self.mode_dropdown.setMinimumWidth(230)
         self.mode_dropdown.addItems(list(MODES.keys()))
         self.mode_dropdown.currentTextChanged.connect(self._on_mode_changed)
         self.current_mode = self.mode_dropdown.currentText()
@@ -111,67 +112,46 @@ class SearchPage(QWidget):
         self.current_page = 1
 
         self.query_input = QLineEdit()
+        self.query_input.setObjectName("SearchBar")
         self.query_input.setPlaceholderText("Enter search value...")
-        self.query_input.setMaximumWidth(600)
+        self.query_input.setFixedHeight(46)
         self.query_input.returnPressed.connect(self._run_search)
+        search_action = self.query_input.addAction(
+            icons.icon("search", 18, "muted"), QLineEdit.LeadingPosition
+        )
+        icons.bind(search_action, "search", 18, "muted")
 
         search_btn = QPushButton("Search")
         search_btn.setObjectName("PrimaryButton")
         search_btn.setCursor(Qt.PointingHandCursor)
+        search_btn.setFixedHeight(46)
         search_btn.clicked.connect(self._run_search)
 
         self.sort_button = SortButton()
         self.sort_button.sort_requested.connect(self._sort)
 
-        controls_row.addWidget(self.mode_dropdown)
-        controls_row.addWidget(self.query_input)
-        controls_row.addWidget(search_btn)
-        controls_row.addWidget(self.sort_button)
-        controls_row.addStretch()
+        controls = FilterBar()
+        controls.row.addWidget(self.mode_dropdown)
+        controls.row.addWidget(self.query_input, stretch=1)
+        controls.row.addWidget(search_btn)
+        controls.row.addWidget(self.sort_button)
+        layout.addWidget(controls)
 
-        layout.addLayout(controls_row)
+        # ---------------- Detail Panels ----------------
 
-        # ---------------- Product Detail Panel ----------------
-
-        self.product_detail_card = QFrame()
-        self.product_detail_card.setObjectName("Card")
-        detail_layout = QVBoxLayout(self.product_detail_card)
-        detail_layout.setContentsMargins(22, 18, 22, 18)
-
-        self.product_detail = QLabel()
-        self.product_detail.setObjectName("DetailText")
-        self.product_detail.setWordWrap(True)
-        self.product_detail.setTextFormat(Qt.RichText)
-        detail_layout.addWidget(self.product_detail)
-
+        self.product_detail_card = DetailPanel(columns=4)
         self.product_detail_card.hide()
         layout.addWidget(self.product_detail_card)
 
-        self.user_detail_card = QFrame()
-        self.user_detail_card.setObjectName("Card")
-        user_detail_layout = QVBoxLayout(self.user_detail_card)
-        user_detail_layout.setContentsMargins(22, 18, 22, 18)
-
-        self.user_detail = QLabel()
-        self.user_detail.setObjectName("DetailText")
-        self.user_detail.setWordWrap(True)
-        self.user_detail.setTextFormat(Qt.RichText)
-        user_detail_layout.addWidget(self.user_detail)
-
+        self.user_detail_card = DetailPanel(columns=4)
         self.user_detail_card.hide()
         layout.addWidget(self.user_detail_card)
 
         # ---------------- Results Table ----------------
 
-        table_card = QFrame()
-        table_card.setObjectName("Card")
-        table_card.setMinimumHeight(320)
-        table_layout = QVBoxLayout(table_card)
-        table_layout.setContentsMargins(12, 12, 12, 12)
-
         self.table = DataTable(PRODUCT_COLUMNS)
-        table_layout.addWidget(self.table)
-
+        table_card = make_table_card(self.table)
+        table_card.setMinimumHeight(340)
         layout.addWidget(table_card, stretch=1)
 
         self.pagination = PaginationControls(PAGE_SIZE)
@@ -192,6 +172,10 @@ class SearchPage(QWidget):
         self.table.columns = columns
         self.table.setColumnCount(len(columns))
         self.table.setHorizontalHeaderLabels([label for _, label in columns])
+        self.table.set_empty_message(
+            "Search the catalog",
+            "Pick a lookup type, enter a value and press Search.",
+        )
         self.table.load_data([])
         self._set_sort_options(columns)
         self.pagination.set_pagination(0, 1)
@@ -238,6 +222,11 @@ class SearchPage(QWidget):
             self.pagination.set_pagination(total, page)
 
             if not results and page == 1:
+                self.table.set_empty_message(
+                    "No results found",
+                    "Nothing matched that value. Check it and try again.",
+                )
+                self.table.load_data([])
                 show_notification(self, "No results found.", "warning")
         except Exception as e:
             show_notification(self, f"Search failed: {e}", "error")
@@ -247,82 +236,63 @@ class SearchPage(QWidget):
         product = overview["product"]
 
         def value(field):
-            return escape(str(product.get(field, "—")))
+            return str(product.get(field, "—"))
 
         statuses = ", ".join(overview["delivery_statuses"]) or "—"
         payment_methods = ", ".join(overview["payment_methods"]) or "—"
         average_rating = overview["average_review_rating"]
         average_rating = average_rating if average_rating is not None else "—"
 
-        self.product_detail.setText(
-            "<h3 style='margin:0 0 10px 0;'>Product Details</h3>"
-            "<table width='100%' cellspacing='20' cellpadding='3'>"
-            f"<tr><td><b>Product ID</b></td><td>{value('product_id')}</td>"
-            "<td width='18%'></td>"
-            f"<td><b>Brand</b></td><td>{value('brand')}</td></tr>"
-            f"<tr><td><b>Category</b></td><td>{value('category')}</td>"
-            "<td width='18%'></td>"
-            f"<td><b>Subcategory</b></td><td>{value('subcategory')}</td></tr>"
-            f"<tr><td><b>Original Price</b></td><td>{value('price')}</td>"
-            "<td width='18%'></td>"
-            f"<td><b>Discount</b></td><td>{value('discount')}%</td></tr>"
-            f"<tr><td><b>Final Price</b></td><td>{value('final_price')}</td>"
-            "<td width='18%'></td>"
-            f"<td><b>Product Stock</b></td><td>{value('stock')}</td></tr>"
-            f"<tr><td><b>Product Rating</b></td><td>{value('rating')}</td>"
-            "<td width='18%'></td>"
-            f"<td><b>Listed Review Count</b></td><td>{value('review_count')}</td></tr>"
-            "</table>"
-            "<h3 style='margin:12px 0 10px 0;'>Related Records</h3>"
-            "<table width='100%' cellspacing='20' cellpadding='3'>"
-            f"<tr><td><b>Inventory Stock</b></td><td>{overview['inventory_stock']}</td>"
-            "<td width='18%'></td>"
-            f"<td><b>Orders</b></td><td>{overview['order_count']}</td></tr>"
-            f"<tr><td><b>Review Records</b></td><td>{overview['review_records']}</td>"
-            "<td width='18%'></td>"
-            f"<td><b>Average Review Rating</b></td><td>{average_rating}</td></tr>"
-            f"<tr><td><b>Shipping Records</b></td><td>{overview['shipping_count']}</td>"
-            "<td width='18%'></td>"
-            f"<td><b>Delivery Statuses</b></td><td>{escape(statuses)}</td></tr>"
-            f"<tr><td><b>Payment Records</b></td><td>{overview['payment_count']}</td>"
-            "<td width='18%'></td>"
-            f"<td><b>Payment Methods</b></td><td>{escape(payment_methods)}</td></tr>"
-            f"<tr><td><b>Returned Orders</b></td><td>{overview['return_count']}</td>"
-            "<td width='18%'></td>"
-            f"<td><b>Order Items</b></td><td>{overview['order_item_count']}</td></tr>"
-            "</table>"
-        )
+        self.product_detail_card.set_sections([
+            ("Product Details", [
+                ("Product ID", value("product_id")),
+                ("Brand", value("brand")),
+                ("Category", value("category")),
+                ("Subcategory", value("subcategory")),
+                ("Original Price", value("price")),
+                ("Discount", f"{value('discount')}%"),
+                ("Final Price", value("final_price")),
+                ("Product Stock", value("stock")),
+                ("Product Rating", value("rating")),
+                ("Listed Review Count", value("review_count")),
+            ]),
+            ("Related Records", [
+                ("Inventory Stock", overview["inventory_stock"]),
+                ("Orders", overview["order_count"]),
+                ("Review Records", overview["review_records"]),
+                ("Average Review Rating", average_rating),
+                ("Shipping Records", overview["shipping_count"]),
+                ("Delivery Statuses", statuses),
+                ("Payment Records", overview["payment_count"]),
+                ("Payment Methods", payment_methods),
+                ("Returned Orders", overview["return_count"]),
+                ("Order Items", overview["order_item_count"]),
+            ]),
+        ])
         self.product_detail_card.show()
 
     def _show_user_overview(self, overview):
         """Display a user and summary data for their linked records."""
-        user_id = escape(str(overview["user"].get("user_id", "—")))
+        user_id = str(overview["user"].get("user_id", "—"))
         statuses = ", ".join(overview["delivery_statuses"]) or "—"
         payment_methods = ", ".join(overview["payment_methods"]) or "—"
 
-        self.user_detail.setText(
-            "<h3 style='margin:0 0 10px 0;'>User Details</h3>"
-            "<table width='100%' cellspacing='20' cellpadding='3'>"
-            f"<tr><td><b>User ID</b></td><td>{user_id}</td>"
-            "<td width='18%'></td>"
-            f"<td><b>Total Orders</b></td><td>{len(overview['orders'])}</td></tr>"
-            f"<tr><td><b>Unique Products Purchased</b></td><td>{overview['unique_products']}</td>"
-            "<td width='18%'></td>"
-            f"<td><b>Order Items</b></td><td>{overview['order_item_count']}</td></tr>"
-            "</table>"
-            "<h3 style='margin:12px 0 10px 0;'>Related Records</h3>"
-            "<table width='100%' cellspacing='20' cellpadding='3'>"
-            f"<tr><td><b>Shipping Records</b></td><td>{overview['shipping_count']}</td>"
-            "<td width='18%'></td>"
-            f"<td><b>Delivery Statuses</b></td><td>{escape(statuses)}</td></tr>"
-            f"<tr><td><b>Payment Records</b></td><td>{overview['payment_count']}</td>"
-            "<td width='18%'></td>"
-            f"<td><b>Payment Methods</b></td><td>{escape(payment_methods)}</td></tr>"
-            f"<tr><td><b>Returned Orders</b></td><td>{overview['return_count']}</td>"
-            "<td width='18%'></td>"
-            "<td><b>Order List</b></td><td>Shown below</td></tr>"
-            "</table>"
-        )
+        self.user_detail_card.set_sections([
+            ("User Details", [
+                ("User ID", user_id),
+                ("Total Orders", len(overview["orders"])),
+                ("Unique Products Purchased", overview["unique_products"]),
+                ("Order Items", overview["order_item_count"]),
+            ]),
+            ("Related Records", [
+                ("Shipping Records", overview["shipping_count"]),
+                ("Delivery Statuses", statuses),
+                ("Payment Records", overview["payment_count"]),
+                ("Payment Methods", payment_methods),
+                ("Returned Orders", overview["return_count"]),
+                ("Order List", "Shown below"),
+            ]),
+        ])
         self.user_detail_card.show()
 
     def _set_sort_options(self, columns):

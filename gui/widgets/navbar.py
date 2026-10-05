@@ -1,19 +1,20 @@
 """
 Navbar Widget
-Top header bar showing branding + admin avatar/name.
-Logo swaps automatically between logo_light.png / logo_dark.png
-based on the active theme. All colors come from the stylesheet
-(#NavbarTitle, #NavbarSubtitle, #NavbarAdmin, #AdminAvatar) —
-nothing is hardcoded here.
+Slim header: breadcrumb on the left; theme switch and the signed-in admin
+chip on the right. All colors come from the stylesheet.
 """
 
-import os
-from PySide6.QtWidgets import QWidget, QHBoxLayout, QVBoxLayout, QLabel
-from PySide6.QtCore import Qt
-from PySide6.QtGui import QPixmap
+from PySide6.QtCore import QSize, Qt, Signal
+from PySide6.QtWidgets import (
+    QFrame, QHBoxLayout, QLabel, QToolButton, QVBoxLayout,
+)
+
+from gui.widgets import icons
 
 
-class Navbar(QWidget):
+class Navbar(QFrame):
+
+    theme_toggle_requested = Signal()
 
     def __init__(self, asset_path, parent=None):
         super().__init__(parent)
@@ -22,77 +23,82 @@ class Navbar(QWidget):
         self.current_theme = "light"
 
         self.setObjectName("Navbar")
-        self.setFixedHeight(86)
+        self.setFixedHeight(66)
 
         layout = QHBoxLayout(self)
-        layout.setContentsMargins(24, 10, 24, 10)
+        layout.setContentsMargins(6, 4, 4, 4)
         layout.setSpacing(0)
 
-        # ---------------- Logo ----------------
+        # ---------------- Breadcrumb ----------------
 
-        self.logo_label = QLabel()
-        layout.addWidget(self.logo_label)
+        crumb = QLabel("Cartify")
+        crumb.setObjectName("NavbarCrumb")
+        layout.addWidget(crumb)
 
-        # ---------------- Title Block ----------------
+        self.crumb_sep = QLabel()
+        self.crumb_sep.setFixedSize(22, 22)
+        self.crumb_sep.setAlignment(Qt.AlignCenter)
+        icons.bind(self.crumb_sep, "chevron_right", 14, "muted")
+        layout.addWidget(self.crumb_sep)
 
-        title_block = QVBoxLayout()
-        title_block.setSpacing(2)
-
-        title = QLabel("CARTIFY")
-        title.setObjectName("NavbarTitle")
-
-        subtitle = QLabel("Smart E-Commerce Platform")
-        subtitle.setObjectName("NavbarSubtitle")
-
-        title_block.addWidget(title)
-        title_block.addWidget(subtitle)
-
-        layout.addSpacing(14)
-        layout.addLayout(title_block)
+        self.page_label = QLabel("Dashboard")
+        self.page_label.setObjectName("NavbarTitle")
+        layout.addWidget(self.page_label)
 
         layout.addStretch()
 
-        # ---------------- Admin Avatar + Name ----------------
+        # ---------------- Theme toggle ----------------
+
+        self.theme_button = QToolButton()
+        self.theme_button.setObjectName("ThemeToggle")
+        self.theme_button.setFixedSize(46, 46)
+        self.theme_button.setCursor(Qt.PointingHandCursor)
+        self.theme_button.setIconSize(QSize(22, 22))
+        self.theme_button.clicked.connect(self.theme_toggle_requested.emit)
+        icons.bind(self.theme_button, "moon", 22, "accent")
+        layout.addWidget(self.theme_button)
+        layout.addSpacing(12)
+
+        # ---------------- Admin chip ----------------
+
+        chip = QFrame()
+        chip.setObjectName("NavbarUserChip")
+        chip.setFixedHeight(50)
+        chip_layout = QHBoxLayout(chip)
+        chip_layout.setContentsMargins(7, 7, 18, 7)
+        chip_layout.setSpacing(10)
 
         self.avatar_label = QLabel("A")
         self.avatar_label.setObjectName("AdminAvatar")
         self.avatar_label.setFixedSize(36, 36)
         self.avatar_label.setAlignment(Qt.AlignCenter)
+        chip_layout.addWidget(self.avatar_label)
 
+        text_block = QVBoxLayout()
+        text_block.setSpacing(0)
+        text_block.setContentsMargins(0, 0, 0, 0)
         self.admin_label = QLabel("Administrator")
         self.admin_label.setObjectName("NavbarAdmin")
+        role = QLabel("Admin access")
+        role.setObjectName("NavbarRole")
+        text_block.addWidget(self.admin_label)
+        text_block.addWidget(role)
+        chip_layout.addLayout(text_block)
 
-        layout.addWidget(self.avatar_label)
-        layout.addSpacing(10)
-        layout.addWidget(self.admin_label)
-
-        self._load_logo()
+        layout.addWidget(chip)
 
     def set_admin_name(self, name):
         self.admin_label.setText(name)
         self.avatar_label.setText(name[:1].upper() if name else "A")
 
+    def set_page_title(self, title):
+        self.page_label.setText(title)
+
     def set_theme(self, theme):
         """Called by MainWindow whenever the theme is switched."""
         self.current_theme = theme
-        self._load_logo()
-
-    def _load_logo(self):
-        preferred = "logo_dark.png" if self.current_theme == "dark" else "logo_light.png"
-        fallback_names = [preferred, "logo_light.png", "logo.png"]
-        logo_path = next(
-            (
-                os.path.join(self.asset_path, name)
-                for name in fallback_names
-                if os.path.exists(os.path.join(self.asset_path, name))
-            ),
-            None,
+        # moon = "switch to dark", sun = "switch to light"
+        icons.rebind(self.theme_button, "sun" if theme == "dark" else "moon")
+        self.theme_button.setToolTip(
+            "Switch to light theme" if theme == "dark" else "Switch to dark theme"
         )
-
-        if logo_path:
-            pixmap = QPixmap(logo_path).scaled(
-                56, 56, Qt.KeepAspectRatio, Qt.SmoothTransformation
-            )
-            self.logo_label.setPixmap(pixmap)
-        else:
-            self.logo_label.clear()

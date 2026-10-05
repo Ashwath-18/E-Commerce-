@@ -4,8 +4,8 @@ Cartify-specific settings surface with section cards and a
 clickable theme toggle.
 """
 
-from PySide6.QtCore import Qt, Signal
-from PySide6.QtGui import QColor, QPainter
+from PySide6.QtCore import QRectF, Qt, Signal
+from PySide6.QtGui import QColor, QLinearGradient, QPainter
 from PySide6.QtWidgets import (
     QCheckBox,
     QFrame,
@@ -17,17 +17,19 @@ from PySide6.QtWidgets import (
 )
 
 from gui.styles import colors
+from gui.widgets.icons import IconBadge
 from gui.widgets.notification import show_notification
+from gui.widgets.page_header import PageHeader
 
 
 class _ToggleSwitch(QCheckBox):
-    """Small pill toggle with a visible sliding knob."""
+    """Pill toggle with a gradient track and a sliding knob."""
 
     def __init__(self, checked=False, parent=None):
         super().__init__(parent)
         self.setChecked(checked)
         self.setCursor(Qt.PointingHandCursor)
-        self.setFixedSize(48, 26)
+        self.setFixedSize(54, 30)
 
     def paintEvent(self, event):
         palette = colors.CURRENT
@@ -35,16 +37,24 @@ class _ToggleSwitch(QCheckBox):
         painter.setRenderHint(QPainter.Antialiasing)
 
         checked = self.isChecked()
-        track_color = palette["PRIMARY"] if checked else palette["BORDER"]
-        knob_color = "#FFFFFF" if checked else palette["TEXT_LIGHT"]
+        track = QRectF(1, 2, 52, 26)
 
         painter.setPen(Qt.NoPen)
-        painter.setBrush(QColor(track_color))
-        painter.drawRoundedRect(0, 2, 48, 22, 11, 11)
+        if checked:
+            grad = QLinearGradient(track.topLeft(), track.topRight())
+            grad.setColorAt(0.0, QColor(palette["GRAD_A"]))
+            grad.setColorAt(1.0, QColor(palette["GRAD_B"]))
+            painter.setBrush(grad)
+        else:
+            painter.setBrush(QColor(palette["TRACK"]))
+        painter.drawRoundedRect(track, 13, 13)
 
-        knob_x = 25 if checked else 3
-        painter.setBrush(QColor(knob_color))
-        painter.drawEllipse(knob_x, 4, 18, 18)
+        knob_x = 29 if checked else 5
+        # soft knob shadow
+        painter.setBrush(QColor(0, 0, 0, 38))
+        painter.drawEllipse(QRectF(knob_x, 6, 20, 20))
+        painter.setBrush(QColor("#FFFFFF"))
+        painter.drawEllipse(QRectF(knob_x, 5, 20, 20))
 
 
 class SettingsPage(QWidget):
@@ -65,28 +75,26 @@ class SettingsPage(QWidget):
         scroll_area.setWidgetResizable(True)
         scroll_area.setFrameShape(QFrame.NoFrame)
         scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        scroll_area.viewport().setAutoFillBackground(False)
         outer_layout.addWidget(scroll_area)
 
         content = QWidget()
         scroll_area.setWidget(content)
 
         layout = QVBoxLayout(content)
-        layout.setContentsMargins(0, 0, 0, 8)
-        layout.setSpacing(16)
+        layout.setContentsMargins(4, 4, 8, 20)
+        layout.setSpacing(18)
 
-        title = QLabel("Settings")
-        title.setObjectName("PageTitle")
-        subtitle = QLabel("Customize your Cartify workspace.")
-        subtitle.setObjectName("PageSubtitle")
-
-        layout.addWidget(title)
-        layout.addWidget(subtitle)
+        layout.addWidget(
+            PageHeader("Settings", "Customize your Cartify workspace.", "settings")
+        )
 
         self.dark_mode_toggle = self._toggle(self.current_theme == "dark")
         self.dark_mode_toggle.toggled.connect(self._toggle_theme)
 
         appearance_card = self._section_card(
             "Appearance",
+            "sun",
             [
                 self._setting_row(
                     "Dark Mode",
@@ -103,22 +111,26 @@ class SettingsPage(QWidget):
 
         data_card = self._section_card(
             "Data & Workspace",
+            "database",
             [
                 self._static_row(
                     "Live Database Metrics",
                     "Dashboard and analytics pages read current MongoDB collection counts.",
                     "Enabled",
+                    "green",
                 ),
                 self._static_row(
                     "CRUD Safety",
                     "Deletes continue to use confirmation dialogs before changing records.",
                     "Protected",
+                    "green",
                 ),
             ],
         )
 
         admin_card = self._section_card(
             "Admin Session",
+            "user",
             [
                 self._static_row(
                     "Access Level",
@@ -135,6 +147,7 @@ class SettingsPage(QWidget):
 
         about_card = self._section_card(
             "About Cartify",
+            "info",
             [
                 self._static_row(
                     "Application",
@@ -150,16 +163,21 @@ class SettingsPage(QWidget):
         layout.addWidget(about_card)
         layout.addStretch()
 
-    def _section_card(self, title, rows):
+    def _section_card(self, title, glyph, rows):
         card = QFrame()
         card.setObjectName("Card")
         card_layout = QVBoxLayout(card)
-        card_layout.setContentsMargins(24, 22, 24, 22)
+        card_layout.setContentsMargins(26, 22, 26, 22)
         card_layout.setSpacing(18)
 
+        head = QHBoxLayout()
+        head.setSpacing(12)
+        head.addWidget(IconBadge(glyph, 38, "soft", glyph=0.56))
         title_label = QLabel(title)
         title_label.setObjectName("ChartTitle")
-        card_layout.addWidget(title_label)
+        head.addWidget(title_label)
+        head.addStretch()
+        card_layout.addLayout(head)
 
         for index, row in enumerate(rows):
             card_layout.addWidget(row)
@@ -194,11 +212,14 @@ class SettingsPage(QWidget):
         row_layout.addWidget(control, alignment=Qt.AlignRight | Qt.AlignVCenter)
         return row
 
-    def _static_row(self, title, description, value):
+    def _static_row(self, title, description, value, tone=None):
         value_label = QLabel(value)
         value_label.setObjectName("SettingsValuePill")
+        if tone:
+            value_label.setObjectName("Pill")
+            value_label.setProperty("tone", tone)
         value_label.setAlignment(Qt.AlignCenter)
-        value_label.setMinimumWidth(92)
+        value_label.setMinimumWidth(96)
         return self._setting_row(title, description, value_label)
 
     def _toggle(self, checked=False):

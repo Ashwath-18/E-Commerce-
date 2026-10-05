@@ -1,8 +1,8 @@
 """
 Analytics Page
-Premium dashboard-style analytics layout using live Cartify
-collection counts. The layout borrows the reference dashboard's
-card rhythm while keeping Cartify's existing theme and data model.
+Dashboard-style analytics layout using live Cartify collection counts:
+a violet "flow" hero curve, a pink highlight card, a donut for the
+collection mix, progress bars and metric tiles.
 """
 
 from PySide6.QtCore import Qt, QRectF
@@ -27,20 +27,42 @@ from database.dashboard_stats import (
     total_users,
 )
 from gui.styles import colors
+from gui.widgets import icons
+from gui.widgets.chart_card import AreaChart
 from gui.widgets.notification import show_notification
+from gui.widgets.page_header import PageHeader
 
 
 CORE_COLLECTIONS = ["Products", "Users", "Orders", "Reviews"]
 SUPPORT_COLLECTIONS = ["Shipping", "Payments", "Inventory", "Sellers"]
 
+# palette keys used for each core collection (ring + legend dots)
+SEGMENT_KEYS = ["PRIMARY", "PINK_B", "AMBER_A", "SUCCESS"]
+
+
+class _Dot(QWidget):
+    """Small legend dot that follows the active theme."""
+
+    def __init__(self, key, parent=None):
+        super().__init__(parent)
+        self._key = key
+        self.setFixedSize(12, 12)
+
+    def paintEvent(self, event):
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.Antialiasing)
+        painter.setPen(Qt.NoPen)
+        painter.setBrush(QColor(colors.CURRENT[self._key]))
+        painter.drawEllipse(QRectF(1, 1, 10, 10))
+
 
 class _RingChart(QWidget):
-    """Small donut chart for the live collection mix."""
+    """Donut chart for the live collection mix."""
 
     def __init__(self, parent=None):
         super().__init__(parent)
         self.values = []
-        self.setMinimumSize(176, 176)
+        self.setMinimumSize(190, 190)
 
     def set_values(self, values):
         self.values = [max(int(value or 0), 0) for value in values]
@@ -51,7 +73,8 @@ class _RingChart(QWidget):
         painter = QPainter(self)
         painter.setRenderHint(QPainter.Antialiasing)
 
-        rect_size = min(self.width(), self.height()) - 34
+        thickness = 18
+        rect_size = min(self.width(), self.height()) - 36
         rect = QRectF(
             (self.width() - rect_size) / 2,
             (self.height() - rect_size) / 2,
@@ -59,91 +82,29 @@ class _RingChart(QWidget):
             rect_size,
         )
 
-        base_pen = QPen(QColor(palette["BORDER"]), 18, Qt.SolidLine, Qt.RoundCap)
-        painter.setPen(base_pen)
+        painter.setPen(QPen(QColor(palette["TRACK"]), thickness, Qt.SolidLine, Qt.FlatCap))
         painter.drawArc(rect, 0, 360 * 16)
 
         total = sum(self.values)
         if total:
-            segment_colors = [
-                QColor(palette["PRIMARY"]),
-                QColor(palette["SECONDARY"]),
-                QColor(palette["ACCENT"]),
-                QColor(palette["SUCCESS"]),
-            ]
             start_angle = 90 * 16
+            gap = 4 * 16 if sum(1 for v in self.values if v) > 1 else 0
             for index, value in enumerate(self.values):
+                if not value:
+                    continue
                 span = int(-(value / total) * 360 * 16)
-                painter.setPen(QPen(segment_colors[index % len(segment_colors)], 18, Qt.SolidLine, Qt.RoundCap))
-                painter.drawArc(rect, start_angle, span)
+                color = QColor(palette[SEGMENT_KEYS[index % len(SEGMENT_KEYS)]])
+                painter.setPen(QPen(color, thickness, Qt.SolidLine, Qt.RoundCap))
+                painter.drawArc(rect, start_angle - gap // 2, span + gap)
                 start_angle += span
 
         painter.setPen(QColor(palette["TEXT"]))
-        painter.setFont(QFont("Segoe UI", 20, QFont.Bold))
-        painter.drawText(self.rect(), Qt.AlignCenter, f"{total:,}")
+        painter.setFont(QFont(colors.FONT_FAMILY, 20, QFont.Bold))
+        painter.drawText(self.rect().adjusted(0, -8, 0, 0), Qt.AlignCenter, f"{total:,}")
 
         painter.setPen(QColor(palette["TEXT_LIGHT"]))
-        painter.setFont(QFont("Segoe UI", 10, QFont.DemiBold))
-        painter.drawText(self.rect().adjusted(0, 48, 0, 0), Qt.AlignCenter, "records")
-
-
-class _Sparkline(QWidget):
-    """Compact line chart for count distribution across collections."""
-
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        self.data = []
-        self.setMinimumHeight(150)
-
-    def set_data(self, data):
-        self.data = list(data or [])
-        self.update()
-
-    def paintEvent(self, event):
-        palette = colors.CURRENT
-        painter = QPainter(self)
-        painter.setRenderHint(QPainter.Antialiasing)
-
-        if not self.data:
-            painter.setPen(QColor(palette["TEXT_LIGHT"]))
-            painter.drawText(self.rect(), Qt.AlignCenter, "No data")
-            return
-
-        left, top, right, bottom = 22, 26, 22, 40
-        chart_w = max(self.width() - left - right, 1)
-        chart_h = max(self.height() - top - bottom, 1)
-        max_value = max((value for _, value in self.data), default=1) or 1
-
-        grid_pen = QPen(QColor(palette["BORDER"]), 1)
-        painter.setPen(grid_pen)
-        for step in range(4):
-            y = top + (chart_h / 3) * step
-            painter.drawLine(left, int(y), self.width() - right, int(y))
-
-        points = []
-        denominator = max(len(self.data) - 1, 1)
-        for index, (_, value) in enumerate(self.data):
-            x = left + (chart_w / denominator) * index
-            y = top + chart_h - ((value / max_value) * chart_h)
-            points.append((x, y))
-
-        line_pen = QPen(QColor(palette["PRIMARY"]), 3, Qt.SolidLine, Qt.RoundCap, Qt.RoundJoin)
-        painter.setPen(line_pen)
-        for index in range(len(points) - 1):
-            x1, y1 = points[index]
-            x2, y2 = points[index + 1]
-            painter.drawLine(int(x1), int(y1), int(x2), int(y2))
-
-        painter.setBrush(QColor(palette["PRIMARY"]))
-        painter.setPen(Qt.NoPen)
-        for x, y in points:
-            painter.drawEllipse(QRectF(x - 4, y - 4, 8, 8))
-
-        painter.setPen(QColor(palette["TEXT_LIGHT"]))
-        painter.setFont(QFont("Segoe UI", 9))
-        for index, (label, _) in enumerate(self.data):
-            x = left + (chart_w / denominator) * index
-            painter.drawText(int(x - 36), self.height() - 24, 72, 18, Qt.AlignCenter, label)
+        painter.setFont(QFont(colors.FONT_FAMILY, 10, QFont.DemiBold))
+        painter.drawText(self.rect().adjusted(0, 40, 0, 0), Qt.AlignCenter, "records")
 
 
 class AnalyticsPage(QWidget):
@@ -159,46 +120,35 @@ class AnalyticsPage(QWidget):
         scroll_area.setWidgetResizable(True)
         scroll_area.setFrameShape(QFrame.NoFrame)
         scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        scroll_area.viewport().setAutoFillBackground(False)
         outer_layout.addWidget(scroll_area)
 
         content = QWidget()
         scroll_area.setWidget(content)
 
         layout = QVBoxLayout(content)
-        layout.setContentsMargins(0, 0, 0, 8)
-        layout.setSpacing(14)
+        layout.setContentsMargins(4, 4, 8, 20)
+        layout.setSpacing(18)
 
-        header_row = QHBoxLayout()
-
-        title_block = QVBoxLayout()
-        title_block.setSpacing(4)
-        title = QLabel("Analytics")
-        title.setObjectName("PageTitle")
-        subtitle = QLabel("Live Cartify metrics arranged for quick operational insight.")
-        subtitle.setObjectName("PageSubtitle")
-        title_block.addWidget(title)
-        title_block.addWidget(subtitle)
-
+        header = PageHeader(
+            "Analytics",
+            "Live Cartify metrics arranged for quick operational insight.",
+            "analytics",
+        )
         refresh_btn = QPushButton("Refresh")
         refresh_btn.setObjectName("SecondaryButton")
         refresh_btn.setCursor(Qt.PointingHandCursor)
-        refresh_btn.setFixedWidth(140)
+        icons.bind(refresh_btn, "refresh", 18, "muted", "primary")
         refresh_btn.clicked.connect(self.refresh)
-
-        header_row.addLayout(title_block)
-        header_row.addStretch()
-        header_row.addWidget(refresh_btn, alignment=Qt.AlignTop)
-        layout.addLayout(header_row)
+        header.add_action(refresh_btn)
+        layout.addWidget(header)
 
         grid = QGridLayout()
-        grid.setHorizontalSpacing(14)
-        grid.setVerticalSpacing(14)
+        grid.setHorizontalSpacing(18)
+        grid.setVerticalSpacing(18)
         grid.setColumnStretch(0, 2)
         grid.setColumnStretch(1, 2)
         grid.setColumnStretch(2, 2)
-        grid.setRowStretch(0, 0)
-        grid.setRowStretch(1, 0)
-        grid.setRowStretch(2, 1)
 
         self.mix_ring = _RingChart()
         self.mix_labels = {}
@@ -210,23 +160,23 @@ class AnalyticsPage(QWidget):
         self.support_labels = {}
         grid.addWidget(self._build_support_card(), 1, 1, 1, 1)
 
-        self.sparkline = _Sparkline()
+        self.sparkline = AreaChart(on_gradient=True, caption="records", min_height=150)
         self.flow_total = QLabel("0")
-        self.flow_total.setObjectName("StatValue")
+        self.flow_total.setObjectName("HeroKpiValue")
         grid.addWidget(self._build_flow_card(), 0, 2, 1, 1)
 
         self.highlight_title = QLabel("Largest Dataset")
-        self.highlight_title.setObjectName("ChartTitle")
+        self.highlight_title.setObjectName("AccentTitle")
         self.highlight_value = QLabel("0")
-        self.highlight_value.setObjectName("StatValue")
+        self.highlight_value.setObjectName("AccentValue")
         self.highlight_note = QLabel("Waiting for live data.")
-        self.highlight_note.setObjectName("PageSubtitle")
+        self.highlight_note.setObjectName("AccentSub")
         grid.addWidget(
-            self._build_text_card(self.highlight_title, self.highlight_value, self.highlight_note),
-            1,
-            2,
-            1,
-            1,
+            self._build_text_card(
+                self.highlight_title, self.highlight_value, self.highlight_note,
+                frame_name="AccentCardPink",
+            ),
+            1, 2, 1, 1,
         )
 
         self.stat_tiles = {}
@@ -239,44 +189,57 @@ class AnalyticsPage(QWidget):
         self.balance_note = QLabel("Compares reviews against products.")
         self.balance_note.setObjectName("PageSubtitle")
         grid.addWidget(
-            self._build_text_card(self.balance_title, self.balance_value, self.balance_note),
-            2,
-            2,
-            1,
-            1,
+            self._build_text_card(
+                self.balance_title, self.balance_value, self.balance_note
+            ),
+            2, 2, 1, 1,
         )
 
         layout.addLayout(grid, stretch=1)
         self.refresh()
 
-    def _card(self, title):
+    # ---------------- Builders ----------------
+
+    def _card(self, title, subtitle=None):
         card = QFrame()
         card.setObjectName("Card")
         layout = QVBoxLayout(card)
-        layout.setContentsMargins(20, 18, 20, 18)
-        layout.setSpacing(10)
+        layout.setContentsMargins(22, 20, 22, 20)
+        layout.setSpacing(12)
 
         title_label = QLabel(title)
         title_label.setObjectName("ChartTitle")
         layout.addWidget(title_label)
+        if subtitle:
+            sub = QLabel(subtitle)
+            sub.setObjectName("ChartSub")
+            layout.addWidget(sub)
         return card, layout
 
+    def _value_row(self, text, dot_key=None):
+        row = QHBoxLayout()
+        row.setSpacing(10)
+        if dot_key:
+            row.addWidget(_Dot(dot_key))
+        label = QLabel(text)
+        label.setObjectName("PanelLabel")
+        value = QLabel("0")
+        value.setObjectName("PanelValue")
+        row.addWidget(label)
+        row.addStretch()
+        row.addWidget(value)
+        return row, value
+
     def _build_mix_card(self):
-        card, layout = self._card("Collection Mix")
+        card, layout = self._card("Collection Mix", "Core records by collection")
         layout.addWidget(self.mix_ring, alignment=Qt.AlignCenter)
 
-        for name in CORE_COLLECTIONS:
-            row = QHBoxLayout()
-            label = QLabel(name)
-            label.setObjectName("PanelLabel")
-            value = QLabel("0")
-            value.setObjectName("NavbarAdmin")
-            row.addWidget(label)
-            row.addStretch()
-            row.addWidget(value)
+        for index, name in enumerate(CORE_COLLECTIONS):
+            row, value = self._value_row(name, SEGMENT_KEYS[index])
             layout.addLayout(row)
             self.mix_labels[name] = value
 
+        layout.addStretch()
         return card
 
     def _build_progress_card(self):
@@ -292,7 +255,7 @@ class AnalyticsPage(QWidget):
             label = QLabel(title)
             label.setObjectName("PanelLabel")
             value = QLabel("0%")
-            value.setObjectName("NavbarAdmin")
+            value.setObjectName("PanelValue")
             label_row.addWidget(label)
             label_row.addStretch()
             label_row.addWidget(value)
@@ -300,7 +263,6 @@ class AnalyticsPage(QWidget):
             bar = QProgressBar()
             bar.setRange(0, 100)
             bar.setTextVisible(False)
-            bar.setFixedHeight(14)
 
             layout.addLayout(label_row)
             layout.addWidget(bar)
@@ -313,14 +275,7 @@ class AnalyticsPage(QWidget):
         card, layout = self._card("Support Collections")
 
         for name in SUPPORT_COLLECTIONS:
-            row = QHBoxLayout()
-            label = QLabel(name)
-            label.setObjectName("PanelLabel")
-            value = QLabel("0")
-            value.setObjectName("NavbarAdmin")
-            row.addWidget(label)
-            row.addStretch()
-            row.addWidget(value)
+            row, value = self._value_row(name)
             layout.addLayout(row)
             self.support_labels[name] = value
 
@@ -328,24 +283,35 @@ class AnalyticsPage(QWidget):
         return card
 
     def _build_flow_card(self):
-        card, layout = self._card("Cartify Flow")
-        layout.addWidget(self.sparkline)
+        card = QFrame()
+        card.setObjectName("HeroCard")
+        layout = QVBoxLayout(card)
+        layout.setContentsMargins(24, 20, 24, 20)
+        layout.setSpacing(6)
+
+        title = QLabel("Cartify Flow")
+        title.setObjectName("HeroTitle")
+        sub = QLabel("Core records at a glance")
+        sub.setObjectName("HeroSub")
+        layout.addWidget(title)
+        layout.addWidget(sub)
+        layout.addWidget(self.sparkline, stretch=1)
 
         row = QHBoxLayout()
         row.addWidget(self.flow_total)
         row.addStretch()
         note = QLabel("total core records")
-        note.setObjectName("PageSubtitle")
+        note.setObjectName("HeroSub")
         row.addWidget(note, alignment=Qt.AlignBottom)
         layout.addLayout(row)
         return card
 
-    def _build_text_card(self, title, value, note):
+    def _build_text_card(self, title, value, note, frame_name="Card"):
         card = QFrame()
-        card.setObjectName("Card")
+        card.setObjectName(frame_name)
         layout = QVBoxLayout(card)
-        layout.setContentsMargins(20, 18, 20, 18)
-        layout.setSpacing(8)
+        layout.setContentsMargins(24, 20, 24, 20)
+        layout.setSpacing(6)
         layout.addWidget(title)
         layout.addStretch()
         layout.addWidget(value)
@@ -354,35 +320,46 @@ class AnalyticsPage(QWidget):
         return card
 
     def _build_tile_grid(self):
-        card, layout = self._card("Core Metrics")
+        card, layout = self._card("Core Metrics", "Live totals from the database")
 
         grid = QGridLayout()
-        grid.setHorizontalSpacing(10)
-        grid.setVerticalSpacing(10)
+        grid.setHorizontalSpacing(12)
+        grid.setVerticalSpacing(12)
+
+        glyphs = {"Products": "products", "Users": "users",
+                  "Orders": "orders", "Reviews": "reviews"}
 
         for index, name in enumerate(CORE_COLLECTIONS):
             tile = QFrame()
             tile.setObjectName("MetricTile")
-            tile_layout = QVBoxLayout(tile)
-            tile_layout.setContentsMargins(16, 12, 16, 12)
-            tile_layout.setSpacing(4)
+            tile_layout = QHBoxLayout(tile)
+            tile_layout.setContentsMargins(16, 14, 16, 14)
+            tile_layout.setSpacing(14)
             tile.setMinimumHeight(92)
 
+            tile_layout.addWidget(icons.IconBadge(glyphs[name], 46, "violet"))
+
+            col = QVBoxLayout()
+            col.setSpacing(0)
             label = QLabel(name)
             label.setObjectName("PanelLabel")
             value = QLabel("0")
             value.setObjectName("TileValue")
-
-            tile_layout.addWidget(label)
-            tile_layout.addWidget(value)
+            col.addStretch()
+            col.addWidget(label)
+            col.addWidget(value)
+            col.addStretch()
+            tile_layout.addLayout(col)
             tile_layout.addStretch()
 
-            row, col = divmod(index, 2)
-            grid.addWidget(tile, row, col)
+            row, column = divmod(index, 2)
+            grid.addWidget(tile, row, column)
             self.stat_tiles[name] = value
 
         layout.addLayout(grid)
         return card
+
+    # ---------------- Data ----------------
 
     def refresh(self):
         try:

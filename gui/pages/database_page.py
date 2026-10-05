@@ -4,9 +4,8 @@ Shows live collection counts and lets the admin run maintenance
 tasks (create collections/indexes, re-check counts) safely from
 the GUI.
 
-NOTE: This file didn't exist in the uploaded gui/pages/ folder —
-the sidebar has a "Database" nav item pointing to it, so it's
-added here to keep the app from crashing on that page.
+NOTE: This page is not registered in the sidebar; it is kept (and
+restyled) so it can be wired up whenever it is needed.
 """
 
 from PySide6.QtWidgets import (
@@ -14,7 +13,9 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtCore import Qt
 
+from gui.widgets import icons
 from gui.widgets.notification import show_notification
+from gui.widgets.page_header import PageHeader
 from gui.dialogs.delete_dialog import confirm_delete  # reused as a generic confirm
 
 from config.mongodb import db
@@ -27,6 +28,12 @@ COLLECTIONS = [
     "Reviews", "Shipping", "Payments", "Inventory"
 ]
 
+GLYPHS = {
+    "Users": "users", "Products": "products", "Sellers": "sellers",
+    "Orders": "orders", "Reviews": "reviews", "Shipping": "shipping",
+    "Payments": "payments", "Inventory": "inventory",
+}
+
 
 class DatabasePage(QWidget):
 
@@ -34,16 +41,14 @@ class DatabasePage(QWidget):
         super().__init__(parent)
 
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setContentsMargins(4, 4, 8, 8)
         layout.setSpacing(16)
 
-        title = QLabel("Database")
-        title.setObjectName("PageTitle")
-        subtitle = QLabel("Live collection counts and maintenance tools.")
-        subtitle.setObjectName("PageSubtitle")
-
-        layout.addWidget(title)
-        layout.addWidget(subtitle)
+        layout.addWidget(
+            PageHeader(
+                "Database", "Live collection counts and maintenance tools.", "database"
+            )
+        )
 
         # ---------------- Collection Count Grid ----------------
 
@@ -58,21 +63,29 @@ class DatabasePage(QWidget):
         for i, name in enumerate(COLLECTIONS):
             row, col = divmod(i, 2)
 
+            tile = QFrame()
+            tile.setObjectName("MetricTile")
+            tile_layout = QHBoxLayout(tile)
+            tile_layout.setContentsMargins(16, 14, 16, 14)
+            tile_layout.setSpacing(14)
+            tile_layout.addWidget(
+                icons.IconBadge(GLYPHS.get(name, "database"), 44, "soft")
+            )
+
+            box = QVBoxLayout()
+            box.setSpacing(0)
             name_label = QLabel(name)
             name_label.setObjectName("PanelLabel")
 
             count_label = QLabel("—")
             count_label.setObjectName("StatValue")
 
-            box = QVBoxLayout()
             box.addWidget(name_label)
             box.addWidget(count_label)
+            tile_layout.addLayout(box)
+            tile_layout.addStretch()
 
-            wrapper = QWidget()
-            wrapper.setObjectName("MetricTile")
-            wrapper.setLayout(box)
-
-            self.grid.addWidget(wrapper, row, col)
+            self.grid.addWidget(tile, row, col)
             self.count_labels[name] = count_label
 
         layout.addWidget(self.count_card)
@@ -83,15 +96,18 @@ class DatabasePage(QWidget):
         action_card.setObjectName("Card")
         action_layout = QHBoxLayout(action_card)
         action_layout.setContentsMargins(24, 20, 24, 20)
+        action_layout.setSpacing(12)
 
         refresh_btn = QPushButton("Refresh Counts")
         refresh_btn.setObjectName("SecondaryButton")
         refresh_btn.setCursor(Qt.PointingHandCursor)
+        icons.bind(refresh_btn, "refresh", 18, "muted", "primary")
         refresh_btn.clicked.connect(self.refresh_counts)
 
         ensure_btn = QPushButton("Ensure Collections + Indexes")
         ensure_btn.setObjectName("PrimaryButton")
         ensure_btn.setCursor(Qt.PointingHandCursor)
+        icons.bind(ensure_btn, "database", 18, "white")
         ensure_btn.clicked.connect(self._ensure_setup)
 
         action_layout.addWidget(refresh_btn)

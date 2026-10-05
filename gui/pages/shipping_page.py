@@ -1,15 +1,15 @@
 """
 Shipping Page
-Table of shipping records. There is no crud module for Shipping
-yet, so this queries the collection directly via config.mongodb.
+Table of shipping records, searched through search/search_products.py.
 """
 
-from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QFrame
+from PySide6.QtWidgets import QWidget, QVBoxLayout
 from gui.widgets.search_bar import SearchBar
 from gui.widgets.sort_button import SortButton
 from gui.widgets.table import DataTable
 from gui.widgets.notification import show_notification
 from gui.widgets.pagination import PaginationControls
+from gui.widgets.page_header import PageHeader, FilterBar, make_table_card
 
 from search.search_products import get_shipping_page
 
@@ -41,41 +41,29 @@ class ShippingPage(QWidget):
         self.current_page = 1
 
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setContentsMargins(4, 4, 8, 8)
         layout.setSpacing(16)
 
-        title = QLabel("Shipping")
-        title.setObjectName("PageTitle")
-        subtitle = QLabel("Track shipment status and delivery times.")
-        subtitle.setObjectName("PageSubtitle")
-
-        layout.addWidget(title)
-        layout.addWidget(subtitle)
+        layout.addWidget(
+            PageHeader("Shipping", "Track shipment status and delivery times.", "shipping")
+        )
 
         self.search_bar = SearchBar(
             placeholder="Search user, product, location, or status..."
         )
         self.search_bar.search_triggered.connect(self._search)
-        self.search_bar.setMaximumWidth(780)
 
         self.sort_button = SortButton(SORT_OPTIONS)
         self.sort_button.sort_requested.connect(self._sort)
 
-        search_row = QHBoxLayout()
-        search_row.addWidget(self.search_bar)
-        search_row.addWidget(self.sort_button)
-        search_row.addStretch()
-        layout.addLayout(search_row)
-
-        table_card = QFrame()
-        table_card.setObjectName("Card")
-        table_layout = QVBoxLayout(table_card)
-        table_layout.setContentsMargins(12, 12, 12, 12)
+        filters = FilterBar()
+        filters.row.addWidget(self.search_bar, stretch=1)
+        filters.row.addWidget(self.sort_button)
+        layout.addWidget(filters)
 
         self.table = DataTable(COLUMNS)
-        table_layout.addWidget(self.table)
-
-        layout.addWidget(table_card, stretch=1)
+        self.table.set_empty_message("No shipments found", "Try a different user, product, location or status.")
+        layout.addWidget(make_table_card(self.table), stretch=1)
 
         self.pagination = PaginationControls(PAGE_SIZE)
         self.pagination.page_changed.connect(self.load_shipping)

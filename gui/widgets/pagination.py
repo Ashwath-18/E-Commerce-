@@ -3,6 +3,8 @@
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import QHBoxLayout, QLabel, QPushButton, QWidget
 
+from gui.widgets import icons
+
 
 class PaginationControls(QWidget):
     """Display page progress and emit requests for another result page."""
@@ -16,7 +18,7 @@ class PaginationControls(QWidget):
         self.total_records = 0
 
         layout = QHBoxLayout(self)
-        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setContentsMargins(4, 0, 4, 0)
         layout.setSpacing(10)
 
         self.summary_label = QLabel()
@@ -24,15 +26,20 @@ class PaginationControls(QWidget):
 
         self.previous_button = QPushButton("Previous")
         self.previous_button.setObjectName("SecondaryButton")
+        self.previous_button.setCursor(Qt.PointingHandCursor)
+        icons.bind(self.previous_button, "chevron_left", 16, "muted", "primary")
         self.previous_button.clicked.connect(self._previous_page)
 
         self.page_label = QLabel()
-        self.page_label.setObjectName("PageSubtitle")
+        self.page_label.setObjectName("Pill")
         self.page_label.setAlignment(Qt.AlignCenter)
-        self.page_label.setMinimumWidth(100)
+        self.page_label.setMinimumWidth(104)
 
         self.next_button = QPushButton("Next")
         self.next_button.setObjectName("SecondaryButton")
+        self.next_button.setCursor(Qt.PointingHandCursor)
+        self.next_button.setLayoutDirection(Qt.RightToLeft)  # icon after the text
+        icons.bind(self.next_button, "chevron_right", 16, "muted", "primary")
         self.next_button.clicked.connect(self._next_page)
 
         layout.addWidget(self.summary_label)

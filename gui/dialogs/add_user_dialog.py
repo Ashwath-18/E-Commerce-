@@ -11,6 +11,8 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Qt
 
 from crud.create import create_user
+from gui.widgets import icons
+from gui.widgets.page_header import dialog_header
 
 
 class AddUserDialog(QDialog):
@@ -19,18 +21,19 @@ class AddUserDialog(QDialog):
         super().__init__(parent)
 
         self.setWindowTitle("Add User")
-        self.setMinimumWidth(380)
+        self.setMinimumWidth(460)
 
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(24, 24, 24, 24)
-        layout.setSpacing(16)
+        layout.setContentsMargins(30, 28, 30, 26)
+        layout.setSpacing(20)
 
-        title = QLabel("Add New User")
-        title.setObjectName("PageTitle")
-        layout.addWidget(title)
+        layout.addWidget(
+            dialog_header("Add New User", "Create a user record by ID.", "users")
+        )
 
         form = QFormLayout()
-        form.setSpacing(12)
+        form.setHorizontalSpacing(18)
+        form.setVerticalSpacing(12)
 
         self.user_id_input = QLineEdit()
         self.user_id_input.setPlaceholderText("e.g. U000123")
@@ -43,6 +46,7 @@ class AddUserDialog(QDialog):
         # ---------------- Buttons ----------------
 
         button_row = QHBoxLayout()
+        button_row.setSpacing(10)
         button_row.addStretch()
 
         cancel_btn = QPushButton("Cancel")
@@ -53,6 +57,7 @@ class AddUserDialog(QDialog):
         save_btn = QPushButton("Save User")
         save_btn.setObjectName("PrimaryButton")
         save_btn.setCursor(Qt.PointingHandCursor)
+        icons.bind(save_btn, "check", 18, "white")
         save_btn.clicked.connect(self._save)
 
         button_row.addWidget(cancel_btn)

@@ -1,14 +1,18 @@
 """Orders page with text search, date-range filtering, and sorting."""
 
-from PySide6.QtCore import QDate
+from PySide6.QtCore import QDate, Qt
+from PySide6.QtGui import QColor, QTextCharFormat
 from PySide6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QFrame, QDateEdit, QPushButton
+    QWidget, QVBoxLayout, QLabel, QDateEdit, QPushButton
 )
+from gui.styles import colors
+from gui.widgets import icons
 from gui.widgets.search_bar import SearchBar
 from gui.widgets.sort_button import SortButton
 from gui.widgets.table import DataTable
 from gui.widgets.notification import show_notification
 from gui.widgets.pagination import PaginationControls
+from gui.widgets.page_header import PageHeader, FilterBar, make_table_card
 
 from search.search_products import get_orders_page
 
@@ -40,84 +44,85 @@ class OrdersPage(QWidget):
         self.current_page = 1
 
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setContentsMargins(4, 4, 8, 8)
         layout.setSpacing(16)
 
-        title = QLabel("Orders")
-        title.setObjectName("PageTitle")
-        subtitle = QLabel("Search orders and filter them by a date range.")
-        subtitle.setObjectName("PageSubtitle")
-
-        layout.addWidget(title)
-        layout.addWidget(subtitle)
+        layout.addWidget(
+            PageHeader(
+                "Orders", "Search orders and filter them by a date range.", "orders"
+            )
+        )
 
         self.search_bar = SearchBar(
             placeholder="Search user, product, payment, status, or returned..."
         )
         self.search_bar.search_triggered.connect(self._apply_filters)
-        self.search_bar.setMaximumWidth(640)
 
         self.sort_button = SortButton(SORT_OPTIONS)
         self.sort_button.sort_requested.connect(self._sort)
 
-        search_row = QHBoxLayout()
-        search_row.addWidget(self.search_bar)
-        search_row.addWidget(self.sort_button)
-        search_row.addStretch()
-        layout.addLayout(search_row)
+        search_filters = FilterBar()
+        search_filters.row.addWidget(self.search_bar, stretch=1)
+        search_filters.row.addWidget(self.sort_button)
+        layout.addWidget(search_filters)
 
         # ---------------- Date Range ----------------
-
-        date_row = QHBoxLayout()
-        date_row.setSpacing(10)
 
         earliest_date = QDate(2000, 1, 1)
 
         from_label = QLabel("From")
+        from_label.setObjectName("FilterLabel")
         self.from_date = QDateEdit()
         self.from_date.setCalendarPopup(True)
         self.from_date.setDisplayFormat("dd MMM yyyy")
         self.from_date.setMinimumDate(earliest_date)
         self.from_date.setDate(earliest_date)
         self.from_date.setSpecialValueText("Select date")
-        self.from_date.setFixedWidth(205)
+        self.from_date.setFixedWidth(210)
+        self.from_date.setFixedHeight(42)
 
         to_label = QLabel("To")
+        to_label.setObjectName("FilterLabel")
         self.to_date = QDateEdit()
         self.to_date.setCalendarPopup(True)
         self.to_date.setDisplayFormat("dd MMM yyyy")
         self.to_date.setMinimumDate(earliest_date)
         self.to_date.setDate(earliest_date)
         self.to_date.setSpecialValueText("Select date")
-        self.to_date.setFixedWidth(205)
+        self.to_date.setFixedWidth(210)
+        self.to_date.setFixedHeight(42)
 
         apply_dates_button = QPushButton("Apply Dates")
-        apply_dates_button.setObjectName("SecondaryButton")
+        apply_dates_button.setObjectName("PrimaryButton")
+        apply_dates_button.setCursor(Qt.PointingHandCursor)
+        icons.bind(apply_dates_button, "check", 18, "white")
         apply_dates_button.clicked.connect(self._apply_filters)
 
         clear_dates_button = QPushButton("Clear")
         clear_dates_button.setObjectName("SecondaryButton")
+        clear_dates_button.setCursor(Qt.PointingHandCursor)
         clear_dates_button.clicked.connect(self._clear_dates)
 
-        date_row.addWidget(QLabel("Purchase Date"))
-        date_row.addWidget(from_label)
-        date_row.addWidget(self.from_date)
-        date_row.addWidget(to_label)
-        date_row.addWidget(self.to_date)
-        date_row.addWidget(apply_dates_button)
-        date_row.addWidget(clear_dates_button)
-        date_row.addStretch()
-        layout.addLayout(date_row)
+        purchase_label = QLabel("Purchase Date")
+        purchase_label.setObjectName("FilterLabel")
 
-        table_card = QFrame()
-        table_card.setObjectName("Card")
-        table_layout = QVBoxLayout(table_card)
-        table_layout.setContentsMargins(12, 12, 12, 12)
+        date_filters = FilterBar()
+        date_filters.row.setSpacing(12)
+        date_filters.row.addWidget(purchase_label)
+        date_filters.row.addWidget(from_label)
+        date_filters.row.addWidget(self.from_date)
+        date_filters.row.addWidget(to_label)
+        date_filters.row.addWidget(self.to_date)
+        date_filters.row.addWidget(apply_dates_button)
+        date_filters.row.addWidget(clear_dates_button)
+        date_filters.row.addStretch()
+        layout.addWidget(date_filters)
 
         self.table = DataTable(COLUMNS)
-        table_layout.addWidget(self.table)
-
-        layout.addWidget(table_card, stretch=1)
+        self.table.set_empty_message(
+            "No orders found", "Try a different search or widen the date range."
+        )
+        layout.addWidget(make_table_card(self.table), stretch=1)
 
         self.pagination = PaginationControls(PAGE_SIZE)
         self.pagination.page_changed.connect(self.load_orders)
@@ -171,6 +176,26 @@ class OrdersPage(QWidget):
     def _sort(self, field, descending):
         self.table.sort_data(field, descending)
 
+    def _style_calendars(self):
+        """Match the calendar popups to the active theme (weekday header, weekends)."""
+        palette = colors.CURRENT
+        header = QTextCharFormat()
+        header.setForeground(QColor(palette["SOFT_TEXT"]))
+        header.setBackground(QColor(palette["CARD"]))
+        weekday = QTextCharFormat()
+        weekday.setForeground(QColor(palette["TEXT"]))
+        weekend = QTextCharFormat()
+        weekend.setForeground(QColor(palette["PINK_B"]))
+
+        for date_edit in (self.from_date, self.to_date):
+            calendar = date_edit.calendarWidget()
+            calendar.setHeaderTextFormat(header)
+            for day in (Qt.Monday, Qt.Tuesday, Qt.Wednesday, Qt.Thursday, Qt.Friday):
+                calendar.setWeekdayTextFormat(day, weekday)
+            calendar.setWeekdayTextFormat(Qt.Saturday, weekend)
+            calendar.setWeekdayTextFormat(Qt.Sunday, weekend)
+
     def showEvent(self, event):
         super().showEvent(event)
+        self._style_calendars()
         self.load_orders(self.current_page)

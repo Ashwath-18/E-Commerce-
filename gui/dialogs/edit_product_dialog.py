@@ -16,6 +16,8 @@ from crud.update import (
     update_product_stock,
     update_product_rating,
 )
+from gui.widgets import icons
+from gui.widgets.page_header import dialog_header
 
 
 class EditProductDialog(QDialog):
@@ -29,25 +31,24 @@ class EditProductDialog(QDialog):
         self.product = product
 
         self.setWindowTitle(f"Edit Product — {product.get('product_id', '')}")
-        self.setMinimumWidth(400)
+        self.setMinimumWidth(480)
 
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(24, 24, 24, 24)
-        layout.setSpacing(16)
+        layout.setContentsMargins(30, 28, 30, 26)
+        layout.setSpacing(20)
 
-        title = QLabel(f"Edit Product: {product.get('product_id', '')}")
-        title.setObjectName("PageTitle")
-        layout.addWidget(title)
-
-        info = QLabel(
-            f"Brand: {product.get('brand', '—')}   |   "
-            f"Category: {product.get('category', '—')}"
+        layout.addWidget(
+            dialog_header(
+                f"Edit Product: {product.get('product_id', '')}",
+                f"Brand: {product.get('brand', '—')}   |   "
+                f"Category: {product.get('category', '—')}",
+                "edit",
+            )
         )
-        info.setObjectName("PageSubtitle")
-        layout.addWidget(info)
 
         form = QFormLayout()
-        form.setSpacing(12)
+        form.setHorizontalSpacing(18)
+        form.setVerticalSpacing(12)
 
         self.price_input = QDoubleSpinBox()
         self.price_input.setMaximum(1_000_000)
@@ -63,6 +64,9 @@ class EditProductDialog(QDialog):
         self.rating_input.setSingleStep(0.1)
         self.rating_input.setValue(float(product.get("rating", 0) or 0))
 
+        for field in (self.price_input, self.stock_input, self.rating_input):
+            field.setMinimumHeight(48)
+
         form.addRow("Price", self.price_input)
         form.addRow("Stock", self.stock_input)
         form.addRow("Rating", self.rating_input)
@@ -72,6 +76,7 @@ class EditProductDialog(QDialog):
         # ---------------- Buttons ----------------
 
         button_row = QHBoxLayout()
+        button_row.setSpacing(10)
         button_row.addStretch()
 
         cancel_btn = QPushButton("Cancel")
@@ -82,6 +87,7 @@ class EditProductDialog(QDialog):
         save_btn = QPushButton("Save Changes")
         save_btn.setObjectName("PrimaryButton")
         save_btn.setCursor(Qt.PointingHandCursor)
+        icons.bind(save_btn, "check", 18, "white")
         save_btn.clicked.connect(self._save)
 
         button_row.addWidget(cancel_btn)

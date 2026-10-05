@@ -10,6 +10,8 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtCore import Qt, Signal
 
+from gui.widgets.page_header import dialog_header
+
 
 class SettingsDialog(QDialog):
 
@@ -19,19 +21,17 @@ class SettingsDialog(QDialog):
         super().__init__(parent)
 
         self.setWindowTitle("Settings")
-        self.setMinimumWidth(360)
+        self.setMinimumWidth(420)
 
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(24, 24, 24, 24)
-        layout.setSpacing(16)
+        layout.setContentsMargins(30, 28, 30, 26)
+        layout.setSpacing(20)
 
-        title = QLabel("Appearance")
-        title.setObjectName("PageTitle")
-        layout.addWidget(title)
-
-        subtitle = QLabel("Choose how Cartify looks on your device.")
-        subtitle.setObjectName("PageSubtitle")
-        layout.addWidget(subtitle)
+        layout.addWidget(
+            dialog_header(
+                "Appearance", "Choose how Cartify looks on your device.", "sun"
+            )
+        )
 
         self.light_radio = QRadioButton("Light - Cartify Violet")
         self.dark_radio = QRadioButton("Dark")
@@ -49,6 +49,7 @@ class SettingsDialog(QDialog):
         layout.addWidget(self.dark_radio)
 
         button_row = QHBoxLayout()
+        button_row.setSpacing(10)
         button_row.addStretch()
 
         cancel_btn = QPushButton("Cancel")

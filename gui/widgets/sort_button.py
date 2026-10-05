@@ -1,10 +1,10 @@
 """Reusable icon button with field-specific sort menus."""
 
-import os
-
 from PySide6.QtCore import Signal, QSize
-from PySide6.QtGui import QAction, QIcon
+from PySide6.QtGui import QAction
 from PySide6.QtWidgets import QMenu, QToolButton
+
+from gui.widgets import icons
 
 
 class SortButton(QToolButton):
@@ -18,16 +18,10 @@ class SortButton(QToolButton):
         self.setObjectName("SortButton")
         self.setToolTip("Sort results")
         self.setFixedSize(46, 46)
-        self.setIconSize(QSize(27, 27))
+        self.setIconSize(QSize(22, 22))
         self.setPopupMode(QToolButton.InstantPopup)
 
-        icon_path = os.path.join(
-            os.path.dirname(os.path.dirname(__file__)), "assets", "sort_icon.png"
-        )
-        if os.path.exists(icon_path):
-            self.setIcon(QIcon(icon_path))
-        else:
-            self.setText("↕")
+        icons.bind(self, "sort", 22, "muted", "primary")
 
         self.sort_menu = QMenu(self)
         self.setMenu(self.sort_menu)

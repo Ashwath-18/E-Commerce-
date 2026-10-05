@@ -17,6 +17,8 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from gui.widgets import icons
+from gui.widgets.page_header import PageHeader
 from ai.service import ShoppingAssistant
 
 
@@ -96,38 +98,34 @@ class AIAssistantPage(QWidget):
         self._workers = []
 
         outer = QVBoxLayout(self)
-        outer.setContentsMargins(0, 0, 0, 0)
-        outer.setSpacing(12)
+        outer.setContentsMargins(4, 4, 8, 8)
+        outer.setSpacing(16)
 
-        header = QHBoxLayout()
-        title_block = QVBoxLayout()
-        title_block.setSpacing(2)
-
-        title = QLabel("AI Shopping Assistant")
-        title.setObjectName("PageTitle")
-        subtitle = QLabel("Ask about products, prices, ratings, stock, and comparisons using the live catalog.")
-        subtitle.setObjectName("PageSubtitle")
-        subtitle.setWordWrap(True)
-        title_block.addWidget(title)
-        title_block.addWidget(subtitle)
-        header.addLayout(title_block, stretch=1)
+        header = PageHeader(
+            "AI Shopping Assistant",
+            "Ask about products, prices, ratings, stock, and comparisons using the live catalog.",
+            "ai",
+        )
 
         clear_btn = QPushButton("New Chat")
         clear_btn.setObjectName("SecondaryButton")
+        clear_btn.setCursor(Qt.PointingHandCursor)
+        icons.bind(clear_btn, "plus", 18, "muted", "primary")
         clear_btn.clicked.connect(self._clear_chat)
-        header.addWidget(clear_btn, alignment=Qt.AlignTop)
-        outer.addLayout(header)
+        header.add_action(clear_btn)
+        outer.addWidget(header)
 
         card = QFrame()
         card.setObjectName("Card")
         card_layout = QVBoxLayout(card)
-        card_layout.setContentsMargins(12, 12, 12, 12)
-        card_layout.setSpacing(10)
+        card_layout.setContentsMargins(16, 16, 16, 16)
+        card_layout.setSpacing(12)
 
         self.scroll = QScrollArea()
         self.scroll.setWidgetResizable(True)
         self.scroll.setFrameShape(QFrame.NoFrame)
         self.scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self.scroll.viewport().setAutoFillBackground(False)
 
         self.message_container = QWidget()
         self.message_layout = QVBoxLayout(self.message_container)
@@ -143,14 +141,18 @@ class AIAssistantPage(QWidget):
         card_layout.addWidget(self.typing)
 
         input_row = QHBoxLayout()
+        input_row.setSpacing(10)
         self.input_box = QLineEdit()
         self.input_box.setPlaceholderText("Try: Show me headphones under ₹5000")
-        self.input_box.setMinimumHeight(44)
+        self.input_box.setObjectName("SearchBar")
+        self.input_box.setFixedHeight(46)
         self.input_box.returnPressed.connect(self._send)
 
-        self.send_button = QPushButton("Send")
-        self.send_button.setObjectName("PrimaryButton")
-        self.send_button.setMinimumHeight(44)
+        self.send_button = QPushButton()
+        self.send_button.setObjectName("SendButton")
+        self.send_button.setToolTip("Send")
+        self.send_button.setCursor(Qt.PointingHandCursor)
+        icons.bind(self.send_button, "send", 20, "white")
         self.send_button.clicked.connect(self._send)
 
         input_row.addWidget(self.input_box, stretch=1)
@@ -207,17 +209,19 @@ class AIAssistantPage(QWidget):
         bubble.setMaximumWidth(860)
 
         bubble_layout = QVBoxLayout(bubble)
-        bubble_layout.setContentsMargins(16, 12, 16, 12)
+        bubble_layout.setContentsMargins(18, 14, 18, 14)
         bubble_layout.setSpacing(8)
 
         label = QLabel("You" if role == "user" else "Cartify AI")
-        label.setObjectName("AIMessageRole")
+        label.setObjectName("AIMessageRoleUser" if role == "user" else "AIMessageRole")
         bubble_layout.addWidget(label)
 
         body = QLabel(escape(text).replace("\n", "<br>"))
-        body.setObjectName("AIMessageText")
+        body.setObjectName("AIMessageTextUser" if role == "user" else "AIMessageText")
         body.setTextFormat(Qt.RichText)
         body.setWordWrap(True)
+        longest = max((self.fontMetrics().horizontalAdvance(line) for line in text.split("\n")), default=0)
+        body.setMinimumWidth(min(int(longest * 1.2) + 12, 560))
         bubble_layout.addWidget(body)
 
         if products:

@@ -9,6 +9,9 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtCore import Qt
 
+from gui.widgets import icons
+from gui.widgets.page_header import dialog_header
+
 
 class DeleteDialog(QDialog):
 
@@ -16,15 +19,15 @@ class DeleteDialog(QDialog):
         super().__init__(parent)
 
         self.setWindowTitle("Confirm Delete")
-        self.setMinimumWidth(380)
+        self.setMinimumWidth(460)
 
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(24, 24, 24, 24)
-        layout.setSpacing(16)
+        layout.setContentsMargins(30, 28, 30, 26)
+        layout.setSpacing(20)
 
-        title = QLabel("Delete Confirmation")
-        title.setObjectName("PageTitle")
-        layout.addWidget(title)
+        layout.addWidget(
+            dialog_header("Delete Confirmation", "", "alert", "pink")
+        )
 
         message = QLabel(
             f"Are you sure you want to delete {item_description}?\n"
@@ -35,6 +38,7 @@ class DeleteDialog(QDialog):
         layout.addWidget(message)
 
         button_row = QHBoxLayout()
+        button_row.setSpacing(10)
         button_row.addStretch()
 
         cancel_btn = QPushButton("Cancel")
@@ -45,6 +49,7 @@ class DeleteDialog(QDialog):
         delete_btn = QPushButton("Delete")
         delete_btn.setObjectName("DangerButton")
         delete_btn.setCursor(Qt.PointingHandCursor)
+        icons.bind(delete_btn, "trash", 18, "white")
         delete_btn.clicked.connect(self.accept)
 
         button_row.addWidget(cancel_btn)

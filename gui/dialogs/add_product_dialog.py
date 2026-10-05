@@ -11,6 +11,8 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Qt
 
 from crud.create import create_product
+from gui.widgets import icons
+from gui.widgets.page_header import dialog_header
 
 
 class AddProductDialog(QDialog):
@@ -19,18 +21,24 @@ class AddProductDialog(QDialog):
         super().__init__(parent)
 
         self.setWindowTitle("Add Product")
-        self.setMinimumWidth(420)
+        self.setMinimumWidth(500)
 
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(24, 24, 24, 24)
-        layout.setSpacing(16)
+        layout.setContentsMargins(30, 28, 30, 26)
+        layout.setSpacing(20)
 
-        title = QLabel("Add New Product")
-        title.setObjectName("PageTitle")
-        layout.addWidget(title)
+        layout.addWidget(
+            dialog_header(
+                "Add New Product",
+                "Fields marked * are required.",
+                "products",
+            )
+        )
 
         form = QFormLayout()
-        form.setSpacing(12)
+        form.setHorizontalSpacing(18)
+        form.setVerticalSpacing(12)
+        form.setLabelAlignment(Qt.AlignLeft | Qt.AlignVCenter)
 
         self.product_id_input = QLineEdit()
         self.category_input = QLineEdit()
@@ -90,6 +98,7 @@ class AddProductDialog(QDialog):
         # ---------------- Buttons ----------------
 
         button_row = QHBoxLayout()
+        button_row.setSpacing(10)
         button_row.addStretch()
 
         cancel_btn = QPushButton("Cancel")
@@ -100,6 +109,7 @@ class AddProductDialog(QDialog):
         save_btn = QPushButton("Save Product")
         save_btn.setObjectName("PrimaryButton")
         save_btn.setCursor(Qt.PointingHandCursor)
+        icons.bind(save_btn, "check", 18, "white")
         save_btn.clicked.connect(self._save)
 
         button_row.addWidget(cancel_btn)
