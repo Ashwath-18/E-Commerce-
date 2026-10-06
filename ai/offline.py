@@ -1,10 +1,10 @@
 """
-Offline assistant (no AI key / no internet).
+Local catalog assistant.
 
 A rule-based engine on top of the SAME database tools the AI uses. It is
 smarter than plain keyword search: it understands sorting words, counts,
 averages, delivery analytics, product ids, "the first one" follow-ups and
-simple comparisons - but it can't hold a free conversation like the real AI.
+simple comparisons without contacting an external service.
 """
 
 import re
@@ -78,12 +78,12 @@ def answer(message, last_products=None):
     if re.fullmatch(r"(hi|hii+|hello|hey|vanakkam|hola|yo)[\s!.?]*", lowered) or "what can you do" in lowered:
         return {
             "message": (
-                "Hi! I'm Cartify AI. In basic mode I can:\n"
+                "Hi! I'm the **Cartify Database Assistant**. I can:\n"
                 "- **Find products** — e.g. *cheapest headphones*, *top rated Electronics under ₹5000*\n"
                 "- **Look up a product** by ID, e.g. *P12345*\n"
                 "- **Count & average** — *how many Sony products*, *average price by brand*\n"
                 "- **Delivery & returns summary**\n\n"
-                "Add an AI key in `.env` to unlock full conversational answers."
+                "Every result is calculated from your local MongoDB database."
             ),
             "products": [],
         }
@@ -177,10 +177,17 @@ def _search(text, lowered, entities):
     result = tools.run_tool("search_products", args)
     products = result.get("products", [])
     if result.get("error"):
-        return {"message": f"I couldn't read the catalog right now: {result['error']}", "products": []}
+        return {
+            "message": "**Catalog temporarily unavailable**\n\nI could not retrieve the requested catalog records just now. Please try again in a moment.",
+            "products": [],
+        }
     if not products:
         return {
-            "message": "I couldn't find matching products. Try a brand, category or a product ID like **P12345**.",
+            "message": (
+                "**No matching catalog records found**\n\n"
+                "I could not locate products that match this request. Please check the product ID or spelling, "
+                "or refine the search with a valid brand, category, subcategory, price, or rating."
+            ),
             "products": [],
         }
 
@@ -197,7 +204,13 @@ def _search(text, lowered, entities):
 def _details(product_id):
     result = tools.run_tool("get_product_details", {"product_id": product_id})
     if result.get("error"):
-        return {"message": result["error"], "products": []}
+        return {
+            "message": (
+                f"**Product record not available**\n\n"
+                f"I could not locate a product with ID **{product_id.upper()}**. Please verify the ID and try again."
+            ),
+            "products": [],
+        }
     p = result["products"][0]
     lines = [
         f"**{p.get('brand', '')} {p.get('subcategory', '')}** ({p.get('product_id')})",
@@ -213,7 +226,10 @@ def _details(product_id):
 def _compare(ids):
     result = tools.run_tool("compare_products", {"product_ids": ids})
     if result.get("error"):
-        return {"message": result["error"], "products": []}
+        return {
+            "message": "**Comparison could not be completed**\n\nPlease provide two or more valid product IDs, such as `P12345` and `P67890`.",
+            "products": [],
+        }
     rows = result["products"]
     lines = ["| Product | Price | Rating | Reviews | Stock |", "|---|---|---|---|---|"]
     for p in rows:
@@ -241,7 +257,10 @@ def _group_stats(field, metric, entities, overall=False):
         }
     rows = result.get("rows", [])
     if not rows:
-        return {"message": "No data available for that question.", "products": []}
+        return {
+            "message": "**No matching data available**\n\nThere are no records available for the selected criteria.",
+            "products": [],
+        }
     title = "Products per" if metric == "count" else "Average price per"
     lines = [f"**{title} {field}:**"]
     for r in rows:
@@ -254,7 +273,10 @@ def _analytics(metric):
     result = tools.run_tool("order_analytics", {"metric": metric})
     rows = result.get("rows", [])
     if result.get("error") or not rows:
-        return {"message": result.get("error", "No order data available."), "products": []}
+        return {
+            "message": "**No matching operational data available**\n\nI could not find records that match this request. Please review the wording or try a different filter.",
+            "products": [],
+        }
     lines = [f"**{metric.replace('_', ' ').title()}** (from {result['total_records']:,} {result['source'].lower()} records):"]
     for r in rows[:10]:
         extra = f", avg {r['avg_shipping_days']} days" if "avg_shipping_days" in r else ""

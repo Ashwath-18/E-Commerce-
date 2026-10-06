@@ -1,4 +1,4 @@
-"""Cartify AI assistant page: streaming chat backed by the live catalog."""
+"""Cartify's local, rule-based MongoDB database assistant page."""
 
 from html import escape
 
@@ -21,10 +21,10 @@ from gui.widgets.page_header import PageHeader
 from ai.service import ShoppingAssistant
 
 SUGGESTIONS = [
-    "Cheapest headphones",
-    "Top rated Electronics",
-    "Which brand has the most products?",
-    "Delivery status summary",
+    "top 5 products by price",
+    "seller rating <2",
+    "most ordered brand",
+    "average shipping days",
 ]
 
 
@@ -108,7 +108,7 @@ class ProductCard(QFrame):
 
 
 class AIAssistantPage(QWidget):
-    """ChatGPT-style assistant: streams answers, renders Markdown, uses live data."""
+    """Local English query assistant backed only by the Cartify MongoDB data."""
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -123,8 +123,8 @@ class AIAssistantPage(QWidget):
         outer.setSpacing(16)
 
         header = PageHeader(
-            "AI Shopping Assistant",
-            "Ask about products, prices, stock and sales in English, தமிழ் or Tanglish.",
+            "Cartify Database Assistant",
+            "Local-only English requests translated into safe MongoDB queries.",
             "ai",
         )
 
@@ -186,7 +186,7 @@ class AIAssistantPage(QWidget):
         input_row = QHBoxLayout()
         input_row.setSpacing(10)
         self.input_box = QLineEdit()
-        self.input_box.setPlaceholderText("Ask anything… e.g. cheapest Sony headphones under ₹5000")
+        self.input_box.setPlaceholderText("Ask in English… e.g. seller rating <2 or top 5 products by price")
         self.input_box.setObjectName("SearchBar")
         self.input_box.setFixedHeight(46)
         self.input_box.returnPressed.connect(self._send)
@@ -210,32 +210,21 @@ class AIAssistantPage(QWidget):
     # ------------------------------------------------------------------
 
     def _refresh_mode_pill(self):
-        if self.assistant.ai_enabled:
-            self.mode_pill.setText(f"AI · {self.assistant.provider.label}")
-            self.mode_pill.setProperty("tone", "green")
-            self.mode_pill.setToolTip("Connected to the AI service")
-        else:
-            self.mode_pill.setText("Basic mode")
-            self.mode_pill.setProperty("tone", "amber")
-            self.mode_pill.setToolTip("Add AI_API_KEY to your .env file to enable the full AI")
+        self.mode_pill.setText(self.assistant.mode_label)
+        self.mode_pill.setProperty("tone", "green")
+        self.mode_pill.setToolTip("Runs locally with Python and MongoDB only; no online AI is used")
         self.mode_pill.style().unpolish(self.mode_pill)
         self.mode_pill.style().polish(self.mode_pill)
 
     def _add_welcome(self):
-        if self.assistant.ai_enabled:
-            text = (
-                "Hi! I'm **Cartify AI**. I read your live catalog and orders, so I can:\n\n"
-                "- find and **compare products** (price, rating, stock, discounts)\n"
-                "- answer **counts and averages** — *which brand has the most products?*\n"
-                "- summarise **delivery, returns and payments**\n\n"
-                "Ask in English, தமிழ் or Tanglish. I never make up data — everything comes from your database."
-            )
-        else:
-            text = (
-                "Hi! I'm **Cartify AI** (basic mode). I can search products, look up IDs, "
-                "count and average things, and summarise deliveries.\n\n"
-                "To unlock full conversations, add `AI_API_KEY` to your `.env` file."
-            )
+        text = (
+            "Hi! I'm the **Cartify Database Assistant**. I use only Python and your live MongoDB "
+            "database—no GPT, Gemini, API key, internet service, or external AI.\n\n"
+            "Try: `top 5 products by price`, `seller rating <2`, `how many returned orders`, "
+            "`most ordered category`, `seller summary`, or `how many times was P13100 ordered`.\n\n"
+            "Use English letters, numbers, and simple symbols. Spelling must be correct, but normal "
+            "grammar and spacing variations are accepted. Create/delete requests always require a separate **CONFIRM** reply."
+        )
         self._add_message("assistant", text, copy_button=False)
 
     # ------------------------------------------------------------------
@@ -356,7 +345,7 @@ class AIAssistantPage(QWidget):
         bubble_layout.setContentsMargins(18, 14, 18, 14)
         bubble_layout.setSpacing(8)
 
-        label = QLabel("You" if role == "user" else "Cartify AI")
+        label = QLabel("You" if role == "user" else "Cartify Assistant")
         label.setObjectName("AIMessageRoleUser" if role == "user" else "AIMessageRole")
         bubble_layout.addWidget(label)
 
@@ -432,7 +421,7 @@ class AIAssistantPage(QWidget):
             self._delete_layout_item(item)
         self._refresh_mode_pill()
         self.chip_row.show()
-        self._add_message("assistant", "New conversation started. What are you looking for?", copy_button=False)
+        self._add_message("assistant", "New local database session started. Type `help` to see supported requests.", copy_button=False)
 
     @staticmethod
     def _delete_layout_item(item):
