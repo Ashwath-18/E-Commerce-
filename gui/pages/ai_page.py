@@ -1,9 +1,8 @@
-"""Production AI shopping assistant page for Cartify."""
+"""Cartify AI assistant page: streaming chat backed by the live catalog."""
 
 from html import escape
 
-from PySide6.QtCore import Qt, QThread, Signal
-from PySide6.QtGui import QFont
+from PySide6.QtCore import QThread, QTimer, Qt, Signal
 from PySide6.QtWidgets import (
     QApplication,
     QFrame,
@@ -21,8 +20,18 @@ from gui.widgets import icons
 from gui.widgets.page_header import PageHeader
 from ai.service import ShoppingAssistant
 
+SUGGESTIONS = [
+    "Cheapest headphones",
+    "Top rated Electronics",
+    "Which brand has the most products?",
+    "Delivery status summary",
+]
+
 
 class _AssistantWorker(QThread):
+    chunk = Signal(str)
+    reset = Signal()
+    status = Signal(str)
     completed = Signal(dict)
     failed = Signal(str)
 
@@ -31,9 +40,18 @@ class _AssistantWorker(QThread):
         self.assistant = assistant
         self.message = message
 
+    def cancel(self):
+        self.assistant.cancel()
+
     def run(self):
         try:
-            self.completed.emit(self.assistant.ask(self.message))
+            result = self.assistant.ask(
+                self.message,
+                on_text=self.chunk.emit,
+                on_reset=self.reset.emit,
+                on_status=self.status.emit,
+            )
+            self.completed.emit(result)
         except Exception:
             self.failed.emit("Something went wrong while processing that request. Please try again.")
 
@@ -90,12 +108,15 @@ class ProductCard(QFrame):
 
 
 class AIAssistantPage(QWidget):
-    """ChatGPT-style UI backed by the real Cartify MongoDB catalog and an optional LLM."""
+    """ChatGPT-style assistant: streams answers, renders Markdown, uses live data."""
 
     def __init__(self, parent=None):
         super().__init__(parent)
         self.assistant = ShoppingAssistant()
         self._workers = []
+        self._stream = None        # state of the bubble currently being streamed
+        self._buffer = ""
+        self._render_pending = False
 
         outer = QVBoxLayout(self)
         outer.setContentsMargins(4, 4, 8, 8)
@@ -103,9 +124,14 @@ class AIAssistantPage(QWidget):
 
         header = PageHeader(
             "AI Shopping Assistant",
-            "Ask about products, prices, ratings, stock, and comparisons using the live catalog.",
+            "Ask about products, prices, stock and sales in English, தமிழ் or Tanglish.",
             "ai",
         )
+
+        self.mode_pill = QLabel()
+        self.mode_pill.setObjectName("Pill")
+        self._refresh_mode_pill()
+        header.add_action(self.mode_pill)
 
         clear_btn = QPushButton("New Chat")
         clear_btn.setObjectName("SecondaryButton")
@@ -135,15 +161,32 @@ class AIAssistantPage(QWidget):
         self.scroll.setWidget(self.message_container)
         card_layout.addWidget(self.scroll, stretch=1)
 
-        self.typing = QLabel("Cartify AI is thinking…")
+        self.typing = QLabel("")
         self.typing.setObjectName("AITyping")
         self.typing.hide()
         card_layout.addWidget(self.typing)
 
+        # ---------------- Suggestion chips ----------------
+
+        self.chip_row = QWidget()
+        chip_layout = QHBoxLayout(self.chip_row)
+        chip_layout.setContentsMargins(0, 0, 0, 0)
+        chip_layout.setSpacing(8)
+        for text in SUGGESTIONS:
+            chip = QPushButton(text)
+            chip.setObjectName("AIChip")
+            chip.setCursor(Qt.PointingHandCursor)
+            chip.clicked.connect(lambda checked=False, t=text: self._send(t))
+            chip_layout.addWidget(chip)
+        chip_layout.addStretch()
+        card_layout.addWidget(self.chip_row)
+
+        # ---------------- Input row ----------------
+
         input_row = QHBoxLayout()
         input_row.setSpacing(10)
         self.input_box = QLineEdit()
-        self.input_box.setPlaceholderText("Try: Show me headphones under ₹5000")
+        self.input_box.setPlaceholderText("Ask anything… e.g. cheapest Sony headphones under ₹5000")
         self.input_box.setObjectName("SearchBar")
         self.input_box.setFixedHeight(46)
         self.input_box.returnPressed.connect(self._send)
@@ -153,60 +196,161 @@ class AIAssistantPage(QWidget):
         self.send_button.setToolTip("Send")
         self.send_button.setCursor(Qt.PointingHandCursor)
         icons.bind(self.send_button, "send", 20, "white")
-        self.send_button.clicked.connect(self._send)
+        self.send_button.clicked.connect(self._send_or_stop)
 
         input_row.addWidget(self.input_box, stretch=1)
         input_row.addWidget(self.send_button)
         card_layout.addLayout(input_row)
         outer.addWidget(card, stretch=1)
 
-        self._add_message(
-            "assistant",
-            "Hi! I can search the live Cartify catalog, filter by price/rating/category/brand, compare products, and keep track of the products we are discussing.\n\n"
-            "The current catalog does not contain detailed specs such as RAM, camera, CPU or battery, so I’ll never invent those details.",
-        )
+        self._add_welcome()
 
-    def _send(self):
-        message = self.input_box.text().strip()
+    # ------------------------------------------------------------------
+    # header badge / welcome
+    # ------------------------------------------------------------------
+
+    def _refresh_mode_pill(self):
+        if self.assistant.ai_enabled:
+            self.mode_pill.setText(f"AI · {self.assistant.provider.label}")
+            self.mode_pill.setProperty("tone", "green")
+            self.mode_pill.setToolTip("Connected to the AI service")
+        else:
+            self.mode_pill.setText("Basic mode")
+            self.mode_pill.setProperty("tone", "amber")
+            self.mode_pill.setToolTip("Add AI_API_KEY to your .env file to enable the full AI")
+        self.mode_pill.style().unpolish(self.mode_pill)
+        self.mode_pill.style().polish(self.mode_pill)
+
+    def _add_welcome(self):
+        if self.assistant.ai_enabled:
+            text = (
+                "Hi! I'm **Cartify AI**. I read your live catalog and orders, so I can:\n\n"
+                "- find and **compare products** (price, rating, stock, discounts)\n"
+                "- answer **counts and averages** — *which brand has the most products?*\n"
+                "- summarise **delivery, returns and payments**\n\n"
+                "Ask in English, தமிழ் or Tanglish. I never make up data — everything comes from your database."
+            )
+        else:
+            text = (
+                "Hi! I'm **Cartify AI** (basic mode). I can search products, look up IDs, "
+                "count and average things, and summarise deliveries.\n\n"
+                "To unlock full conversations, add `AI_API_KEY` to your `.env` file."
+            )
+        self._add_message("assistant", text, copy_button=False)
+
+    # ------------------------------------------------------------------
+    # sending / streaming
+    # ------------------------------------------------------------------
+
+    def _send_or_stop(self):
+        if self._workers:
+            self._stop()
+        else:
+            self._send()
+
+    def _stop(self):
+        for worker in self._workers:
+            worker.cancel()
+        self.typing.setText("Stopping…")
+
+    def _send(self, text=None):
+        message = (text if isinstance(text, str) else self.input_box.text()).strip()
         if not message or self._workers:
             return
 
+        self.chip_row.hide()
         self._add_message("user", message)
         self.input_box.clear()
         self.input_box.setEnabled(False)
-        self.send_button.setEnabled(False)
+        self._set_busy(True)
+        self.typing.setText("Thinking…")
         self.typing.show()
-        self._scroll_to_bottom()
+        self._stream = None
+        self._buffer = ""
 
         worker = _AssistantWorker(self.assistant, message, self)
+        worker.chunk.connect(self._on_chunk)
+        worker.reset.connect(self._on_reset)
+        worker.status.connect(self._on_status)
         worker.completed.connect(self._handle_result)
         worker.failed.connect(self._handle_failure)
         worker.finished.connect(lambda: self._worker_finished(worker))
         self._workers.append(worker)
         worker.start()
 
+    def _set_busy(self, busy):
+        if busy:
+            icons.rebind(self.send_button, "close")
+            self.send_button.setToolTip("Stop generating")
+        else:
+            icons.rebind(self.send_button, "send")
+            self.send_button.setToolTip("Send")
+
+    def _on_status(self, text):
+        if self._stream is None:
+            self.typing.setText(text)
+            self.typing.show()
+
+    def _on_chunk(self, delta):
+        if self._stream is None:
+            self.typing.hide()
+            self._stream = self._create_bubble("assistant")
+            self._buffer = ""
+        self._buffer += delta
+        if not self._render_pending:
+            self._render_pending = True
+            QTimer.singleShot(45, self._render_stream)
+
+    def _on_reset(self):
+        self._buffer = ""
+        if self._stream is not None:
+            self._stream["body"].setText("")
+
+    def _render_stream(self):
+        self._render_pending = False
+        if self._stream is not None:
+            self._stream["body"].setText(self._buffer)
+            self._scroll_to_bottom()
+
     def _worker_finished(self, worker):
         if worker in self._workers:
             self._workers.remove(worker)
         worker.deleteLater()
         self.input_box.setEnabled(True)
-        self.send_button.setEnabled(True)
+        self._set_busy(False)
         self.input_box.setFocus()
         self.typing.hide()
         self._scroll_to_bottom()
 
     def _handle_result(self, result):
-        self._add_message("assistant", result.get("message", "I couldn't generate a response."), result.get("products", []))
+        text = result.get("message", "I couldn't generate a response.")
+        products = result.get("products", [])
+
+        if self._stream is not None:
+            self._stream["body"].setText(text)
+            self._finish_bubble(self._stream, text, products)
+            self._stream = None
+        else:
+            self._add_message("assistant", text, products)
+        self._buffer = ""
 
     def _handle_failure(self, message):
-        self._add_message("assistant", message)
+        if self._stream is not None:
+            self._stream = None
+        self._add_message("assistant", message, copy_button=False)
 
-    def _add_message(self, role, text, products=None):
+    # ------------------------------------------------------------------
+    # bubbles
+    # ------------------------------------------------------------------
+
+    def _create_bubble(self, role):
         row = QHBoxLayout()
         row.setContentsMargins(4, 0, 4, 0)
         bubble = QFrame()
         bubble.setObjectName("AIUserBubble" if role == "user" else "AIAssistantBubble")
         bubble.setMaximumWidth(860)
+        if role != "user":
+            bubble.setMinimumWidth(360)
 
         bubble_layout = QVBoxLayout(bubble)
         bubble_layout.setContentsMargins(18, 14, 18, 14)
@@ -216,20 +360,12 @@ class AIAssistantPage(QWidget):
         label.setObjectName("AIMessageRoleUser" if role == "user" else "AIMessageRole")
         bubble_layout.addWidget(label)
 
-        body = QLabel(escape(text).replace("\n", "<br>"))
+        body = QLabel()
         body.setObjectName("AIMessageTextUser" if role == "user" else "AIMessageText")
-        body.setTextFormat(Qt.RichText)
+        body.setTextFormat(Qt.PlainText if role == "user" else Qt.MarkdownText)
         body.setWordWrap(True)
-        longest = max((self.fontMetrics().horizontalAdvance(line) for line in text.split("\n")), default=0)
-        body.setMinimumWidth(min(int(longest * 1.2) + 12, 560))
+        body.setTextInteractionFlags(Qt.TextSelectableByMouse)
         bubble_layout.addWidget(body)
-
-        if products:
-            product_label = QLabel("Catalog matches")
-            product_label.setObjectName("AISectionLabel")
-            bubble_layout.addWidget(product_label)
-            for product in products[:8]:
-                bubble_layout.addWidget(ProductCard(product))
 
         if role == "user":
             row.addStretch()
@@ -240,15 +376,63 @@ class AIAssistantPage(QWidget):
 
         self.message_layout.insertLayout(self.message_layout.count() - 1, row)
         self._scroll_to_bottom()
+        return {"bubble": bubble, "layout": bubble_layout, "body": body}
+
+    def _finish_bubble(self, state, text, products=None, copy_button=True):
+        layout = state["layout"]
+
+        if products:
+            product_label = QLabel("Catalog matches")
+            product_label.setObjectName("AISectionLabel")
+            layout.addWidget(product_label)
+            for product in products[:8]:
+                layout.addWidget(ProductCard(product))
+
+        if copy_button:
+            row = QHBoxLayout()
+            row.addStretch()
+            copy = QPushButton("Copy")
+            copy.setObjectName("AICopy")
+            copy.setCursor(Qt.PointingHandCursor)
+            copy.clicked.connect(lambda checked=False, b=copy, t=text: self._copy(b, t))
+            row.addWidget(copy)
+            layout.addLayout(row)
+
+        self._scroll_to_bottom()
+
+    def _copy(self, button, text):
+        QApplication.clipboard().setText(text)
+        button.setText("Copied ✓")
+        QTimer.singleShot(1300, lambda: button.setText("Copy"))
+
+    def _add_message(self, role, text, products=None, copy_button=True):
+        state = self._create_bubble(role)
+        state["body"].setText(text)
+
+        if role == "user":
+            longest = max(
+                (self.fontMetrics().horizontalAdvance(line) for line in text.split("\n")), default=0
+            )
+            state["body"].setMinimumWidth(min(int(longest * 1.2) + 12, 560))
+        else:
+            self._finish_bubble(state, text, products, copy_button=copy_button)
+        return state
+
+    # ------------------------------------------------------------------
+    # misc
+    # ------------------------------------------------------------------
 
     def _clear_chat(self):
         if self._workers:
             return
         self.assistant.reset()
+        self._stream = None
         while self.message_layout.count() > 1:
             item = self.message_layout.takeAt(0)
             self._delete_layout_item(item)
-        self._add_message("assistant", "New conversation started. What are you looking for?")
+        self._refresh_mode_pill()
+        self.chip_row.show()
+        self._add_message("assistant", "New conversation started. What are you looking for?", copy_button=False)
 
     @staticmethod
     def _delete_layout_item(item):
@@ -261,6 +445,8 @@ class AIAssistantPage(QWidget):
                 AIAssistantPage._delete_layout_item(child_layout.takeAt(0))
 
     def _scroll_to_bottom(self):
-        QApplication.processEvents()
-        bar = self.scroll.verticalScrollBar()
-        bar.setValue(bar.maximum())
+        def go():
+            bar = self.scroll.verticalScrollBar()
+            bar.setValue(bar.maximum())
+
+        QTimer.singleShot(30, go)

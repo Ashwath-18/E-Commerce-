@@ -394,6 +394,24 @@ QPushButton#GlassButton:hover {
     border-radius: 18px;
 }
 
+#ReportKpiCard {
+    background-color: $REPORT_CARD_BG;
+    border: 1px solid $REPORT_CARD_BORDER;
+    border-radius: 14px;
+}
+
+#ReportKpiLabel {
+    color: $REPORT_LABEL;
+    font-size: 11px;
+    font-weight: 700;
+}
+
+#ReportKpiValue {
+    color: $REPORT_VALUE;
+    font-size: 23px;
+    font-weight: 800;
+}
+
 #DetailText {
     color: $TEXT;
     background-color: transparent;
@@ -1120,6 +1138,36 @@ QCheckBox#ToggleSwitch {
     font-size: 12px;
 }
 
+QPushButton#AIChip {
+    background-color: $SURFACE_ALT;
+    color: $SOFT_TEXT;
+    border: 1px solid $SOFT_BORDER;
+    border-radius: 16px;
+    padding: 7px 14px;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+QPushButton#AIChip:hover {
+    background-color: $SOFT;
+    border-color: $PRIMARY;
+}
+
+QPushButton#AICopy {
+    background-color: transparent;
+    color: $TEXT_LIGHT;
+    border: 1px solid transparent;
+    border-radius: 12px;
+    padding: 3px 12px;
+    font-size: 11px;
+    font-weight: 700;
+}
+
+QPushButton#AICopy:hover {
+    background-color: $SOFT;
+    color: $SOFT_TEXT;
+}
+
 /* ---------------- Login / splash ---------------- */
 
 #LoginRoot, #SplashRoot {
@@ -1264,6 +1312,13 @@ def build(theme):
     t["TOOLTIP_BG"] = "#1C1A3A" if not dark else "#2A2B66"
     t["TOOLTIP_TEXT"] = "#FFFFFF"
     t["TOOLTIP_BORDER"] = "#1C1A3A" if not dark else "#4B47A6"
+
+    if dark:
+        t.update(REPORT_CARD_BG="#151524", REPORT_CARD_BORDER="#303044",
+                 REPORT_LABEL="#A5ADBD", REPORT_VALUE="#C4B5FD")
+    else:
+        t.update(REPORT_CARD_BG="#FFFFFF", REPORT_CARD_BORDER="#DDE3F5",
+                 REPORT_LABEL="#64748B", REPORT_VALUE="#4F46E5")
 
     if dark:
         t.update(

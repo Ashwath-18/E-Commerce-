@@ -1102,6 +1102,36 @@ QCheckBox#ToggleSwitch {
     font-size: 12px;
 }
 
+QPushButton#AIChip {
+    background-color: #F4F5FC;
+    color: #5B4BC4;
+    border: 1px solid #DDD7F8;
+    border-radius: 16px;
+    padding: 7px 14px;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+QPushButton#AIChip:hover {
+    background-color: #EFECFD;
+    border-color: #6C5CD6;
+}
+
+QPushButton#AICopy {
+    background-color: transparent;
+    color: #8B8EAB;
+    border: 1px solid transparent;
+    border-radius: 12px;
+    padding: 3px 12px;
+    font-size: 11px;
+    font-weight: 700;
+}
+
+QPushButton#AICopy:hover {
+    background-color: #EFECFD;
+    color: #5B4BC4;
+}
+
 /* ---------------- Login / splash ---------------- */
 
 #LoginRoot, #SplashRoot {

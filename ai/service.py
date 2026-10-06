@@ -1,381 +1,227 @@
-"""Robust conversation orchestration for Cartify AI.
+"""
+Cartify AI service.
 
-This version keeps the assistant useful even when MongoDB or the external
-AI provider is temporarily unavailable. It never lets a backend exception
-escape to the UI as a generic "Something went wrong" message.
+ask() runs the "think -> look something up -> answer" loop:
+
+  1. send the conversation + tool definitions to the language model
+  2. if the model asks for tools, run them against MongoDB and loop
+  3. stream the final answer back to the UI as it is written
+
+Without an AI key (or if the AI service fails) it falls back to the offline
+engine in ai/offline.py, which uses the same database tools.
 """
 
-import re
-from dataclasses import dataclass, field
+import json
 
-from ai.prompts import SYSTEM_PROMPT
+from ai import offline, tools
+from ai.prompts import build_system_prompt
 from ai.provider import AIProviderError, create_provider
-from ai.retrieval import find_by_context, format_products, get_product, retrieve_products
+
+MAX_TOOL_ROUNDS = 5
+HISTORY_LIMIT = 20
+TOOL_RESULT_LIMIT = 7000
 
 
-@dataclass
-class ChatState:
-    messages: list = field(default_factory=list)
-    last_products: list = field(default_factory=list)
+def _noop(*_args, **_kwargs):
+    return None
 
 
 class ShoppingAssistant:
+
     def __init__(self):
         self.provider = create_provider()
-        self.state = ChatState()
+        self.history = []          # [{"role": "user"|"assistant", "content": str}]
+        self.last_products = []    # products shown in the previous reply
+        self._cancel = False
+        self._hinted = False
+
+    # ------------------------------------------------------------------
+    # public API
+    # ------------------------------------------------------------------
+
+    @property
+    def ai_enabled(self):
+        return self.provider.configured
 
     def reset(self):
-        self.state = ChatState()
+        self.history = []
+        self.last_products = []
+        self._hinted = False
 
-    def ask(self, message):
+    def cancel(self):
+        """Ask a running ask() call to stop as soon as possible."""
+        self._cancel = True
+
+    def ask(self, message, on_text=None, on_reset=None, on_status=None):
+        """
+        Answer one user message. Returns {"message", "products", "mode"}.
+
+        on_text(delta)  - called with each streamed piece of text
+        on_reset()      - called when streamed text so far should be discarded
+        on_status(text) - called with a short progress message ("Searching ...")
+        """
         message = (message or "").strip()
-
         if not message:
-            return {
-                "message": "Please type a question or shopping request.",
-                "products": [],
-                "ai": False,
-            }
+            return {"message": "Ask me about products, prices, ratings or stock.", "products": [], "mode": "none"}
 
-        # Handle normal conversation before touching MongoDB. This means
-        # "hello", "hi", "what can you do?" etc. still work if MongoDB is down.
-        if self._is_greeting(message):
-            reply, ai_used = self._generate_safely(
-                message,
-                products=[],
-                extra_instruction=(
-                    "This is a casual greeting. Reply naturally and briefly, "
-                    "then mention that you can help search the Cartify catalog."
-                ),
+        self._cancel = False
+        on_text = on_text or _noop
+        on_reset = on_reset or _noop
+        on_status = on_status or _noop
+
+        notice = ""
+        if self.provider.configured:
+            try:
+                result = self._ask_llm(message, on_text, on_reset, on_status)
+                self._remember(message, result)
+                return result
+            except AIProviderError as exc:
+                notice = f"> ⚠️ {exc} Showing a basic answer instead.\n\n"
+        elif not self._hinted:
+            self._hinted = True
+            notice = (
+                "> 💡 Basic mode: add `AI_API_KEY` to your `.env` file to turn on the full AI.\n\n"
             )
-            return self._finish(message, reply, [], ai_used)
 
-        if self._is_capability_request(message):
-            reply, ai_used = self._generate_safely(
-                message,
-                products=[],
-                extra_instruction=(
-                    "Explain briefly what this shopping assistant can do. "
-                    "Mention catalog search, price/rating/brand/category filters, "
-                    "comparisons and follow-up references."
-                ),
-            )
-            return self._finish(message, reply, [], ai_used)
+        on_reset()
+        result = offline.answer(message, self.last_products)
+        result["message"] = notice + result["message"]
+        result["mode"] = "offline"
+        self._remember(message, result)
+        return result
 
-        # Resolve conversational references. If MongoDB is temporarily
-        # unavailable, this block is protected and the assistant can still
-        # attempt a normal LLM response.
-        context_product = None
-        try:
-            context_product, _ = find_by_context(message, self.state.last_products)
-        except Exception:
-            context_product = None
+    # ------------------------------------------------------------------
+    # LLM loop
+    # ------------------------------------------------------------------
 
-        if self._is_order_request(message):
-            reply = (
-                "I can see that this project has order-related data, but the "
-                "current login is an admin-only login rather than a customer "
-                "account session. So I won't expose or guess a customer's "
-                "personal order information."
-            )
-            return self._finish(message, reply, [], False)
-
-        if self._is_cart_request(message):
-            reply = (
-                "The current Cartify project does not have a cart collection "
-                "or cart service. I won't pretend that an item was added or "
-                "removed. I can still help you find and compare the products."
-            )
-            return self._finish(message, reply, [], False)
-
-        # Retrieve real catalog records when the request looks shopping-related.
-        products = []
-        retrieval_error = None
-        try:
-            products = self._retrieve_for_message(message, context_product)
-        except Exception as exc:
-            retrieval_error = exc
-            products = []
-
-        if not products and context_product and self._looks_like_detail_request(message):
-            products = [context_product]
-
-        context = self._build_context(products)
-
-        # Give the real LLM the user's question plus only the relevant
-        # catalog records. If the provider is unavailable, use a useful
-        # deterministic fallback instead of exposing an exception.
-        reply, ai_used = self._generate_safely(
-            message,
-            products,
-            extra_instruction=(
-                "Answer the user's request directly. Use the supplied catalog "
-                "records when the request is about Cartify products. Never "
-                "invent product facts. If the user asks for something that is "
-                "not present in the catalog, say so clearly."
-            ),
-            context=context,
+    def _ask_llm(self, message, on_text, on_reset, on_status):
+        messages = (
+            [{"role": "system", "content": self._system_prompt()}]
+            + self.history[-HISTORY_LIMIT:]
+            + [{"role": "user", "content": message}]
         )
 
-        # If both MongoDB and the LLM failed, make the failure understandable
-        # and actionable instead of showing a generic UI error.
-        if retrieval_error is not None and not ai_used and not products:
-            reply = (
-                "I couldn't access the Cartify product catalog right now. "
-                "Please make sure MongoDB is running at "
-                "mongodb://localhost:27017/ and try again. "
-                "Your question was received correctly."
+        use_tools = True
+        tool_failures = 0
+        shown = []
+        final_text = ""
+
+        for round_number in range(MAX_TOOL_ROUNDS + 1):
+            if self._cancel:
+                break
+
+            offer_tools = tools.TOOLS if use_tools and round_number < MAX_TOOL_ROUNDS else None
+            on_status("Thinking…")
+
+            try:
+                content, calls = self._one_round(messages, offer_tools, on_text)
+            except AIProviderError as exc:
+                if exc.tool_failure and tool_failures < 2:
+                    tool_failures += 1
+                    on_reset()
+                    if tool_failures == 2:
+                        # The model can't do tool calls: ground it with offline data instead.
+                        use_tools = False
+                        context = offline.answer(message, self.last_products)
+                        messages.append(
+                            {
+                                "role": "system",
+                                "content": "Tools are unavailable. Use ONLY this retrieved catalog data "
+                                           "to answer, and don't invent anything else:\n" + context["message"],
+                            }
+                        )
+                        if context["products"]:
+                            shown = list(context["products"])
+                    continue
+                raise
+
+            if not calls:
+                final_text = content
+                break
+
+            # The model wants data: discard any preamble text and run the tools.
+            on_reset()
+            messages.append(
+                {
+                    "role": "assistant",
+                    "content": content or None,
+                    "tool_calls": [
+                        {
+                            "id": c["id"],
+                            "type": "function",
+                            "function": {"name": c["name"], "arguments": c["arguments"]},
+                        }
+                        for c in calls
+                    ],
+                }
             )
+            for call in calls:
+                if self._cancel:
+                    break
+                on_status(tools.STATUS_TEXT.get(call["name"], "Looking that up…"))
+                try:
+                    arguments = json.loads(call["arguments"] or "{}")
+                except ValueError:
+                    arguments = {}
+                result = tools.run_tool(call["name"], arguments)
 
-        return self._finish(message, reply, products, ai_used)
+                if isinstance(result, dict) and result.get("products"):
+                    shown = list(result["products"])
 
-    def _generate_safely(self, message, products, extra_instruction="", context=None):
-        if context is None:
-            context = self._build_context(products)
-
-        try:
-            reply = self.provider.generate(
-                SYSTEM_PROMPT + "\n\n" + extra_instruction,
-                self.state.messages,
-                message,
-                context,
-            )
-            return reply.strip(), True
-        except AIProviderError as exc:
-            return self._fallback_reply(message, products, str(exc)), False
-        except Exception as exc:
-            # Never let provider/parser/network implementation details reach
-            # the PySide UI as an unhandled exception.
-            return self._fallback_reply(message, products, str(exc)), False
-
-    def _retrieve_for_message(self, message, context_product):
-        text = message.casefold()
-
-        if context_product and any(
-            k in text
-            for k in (
-                "details",
-                "detail",
-                "available",
-                "stock",
-                "price",
-                "how much",
-                "rating",
-            )
-        ):
-            product_id = context_product.get("product_id")
-            return [get_product(product_id) or context_product]
-
-        if self.state.last_products and "cheaper" in text:
-            prices = [
-                float(p.get("final_price", 0) or 0)
-                for p in self.state.last_products
-                if p.get("final_price") is not None
-            ]
-            if prices:
-                return self._price_relative(min(prices), cheaper=True)
-
-        if self.state.last_products and re.search(
-            r"\b(more expensive|costlier)\b", text
-        ):
-            prices = [
-                float(p.get("final_price", 0) or 0)
-                for p in self.state.last_products
-                if p.get("final_price") is not None
-            ]
-            if prices:
-                return self._price_relative(max(prices), cheaper=False)
-
-        if self.state.last_products and re.search(
-            r"\b(show|give) me more\b|\bmore options\b", text
-        ):
-            previous = self.state.last_products
-            seed = previous[0] if previous else {}
-            query = (
-                f"{seed.get('category', '')} "
-                f"{seed.get('subcategory', '')} "
-                f"{seed.get('brand', '')}"
-            )
-            return retrieve_products(
-                query,
-                limit=8,
-                exclude_ids=[p.get("product_id") for p in previous],
-            )
-
-        ids = re.findall(r"\bP\d{3,}\b", message, re.I)
-        if ids:
-            product = get_product(ids[0])
-            return [product] if product else []
-
-        if context_product and re.search(
-            r"\b(this|that|it|same|similar)\b", text
-        ):
-            return [context_product]
-
-        return retrieve_products(message, limit=8)
-
-    @staticmethod
-    def _price_relative(reference, cheaper=True):
-        from config.mongodb import db
-
-        operator = {"$lt": reference} if cheaper else {"$gt": reference}
-        return list(
-            db["Products"]
-            .find({"final_price": operator}, {"_id": 0})
-            .sort([("rating", -1), ("review_count", -1)])
-            .limit(8)
-        )
-
-    @staticmethod
-    def _looks_like_detail_request(message):
-        return bool(
-            re.search(
-                r"\b(details?|specs?|information|available|stock|price|rating)\b",
-                message.casefold(),
-            )
-        )
-
-    @staticmethod
-    def _is_order_request(message):
-        # Only personal order/shipment questions ("where is my order",
-        # "track my shipment", "order status"), not phrases like
-        # "in order to" or "fast delivery".
-        return bool(
-            re.search(
-                r"\b(my|track|tracking|where is|status of|cancel|return)\b.{0,30}"
-                r"\b(orders?|shipments?|packages?|deliver(?:y|ies))\b"
-                r"|\b(orders?|shipment|package)\s+(status|history|id|number)\b",
-                message.casefold(),
-            )
-        )
-
-    @staticmethod
-    def _is_cart_request(message):
-        return bool(
-            re.search(
-                r"\bcart\b|\badd .*\bto cart\b|\bremove .*\bfrom cart\b",
-                message.casefold(),
-            )
-        )
-
-    @staticmethod
-    def _is_greeting(message):
-        text = message.casefold().strip()
-        return bool(
-            re.fullmatch(
-                r"(hi|hello|hey|hii|hiii|good morning|good afternoon|good evening|"
-                r"vanakkam|வணக்கம்)[!. ]*",
-                text,
-            )
-        )
-
-    @staticmethod
-    def _is_capability_request(message):
-        text = message.casefold()
-        return bool(
-            re.search(
-                r"\b(what can you do|what do you do|help me|how can you help|"
-                r"what are you capable of|capabilities)\b",
-                text,
-            )
-        )
-
-    @staticmethod
-    def _build_context(products):
-        if not products:
-            return "No matching catalog records were retrieved."
-
-        rows = format_products(products)
-        lines = []
-
-        for index, p in enumerate(rows, start=1):
-            lines.append(
-                f"{index}. {p['product_id']} | "
-                f"brand={p['brand']} | "
-                f"category={p['category']} | "
-                f"subcategory={p['subcategory']} | "
-                f"final_price=₹{p['final_price']} | "
-                f"discount={p['discount']}% | "
-                f"stock={p['stock']} | "
-                f"rating={p['rating']} | "
-                f"review_count={p['review_count']} | "
-                f"seller_rating={p['seller_rating']}"
-            )
-
-        return "\n".join(lines)
-
-    @staticmethod
-    def _fallback_reply(message, products, error=""):
-        text = message.casefold().strip()
-
-        if re.search(r"\b(hello|hi|hey|hii|hiii)\b", text):
-            return (
-                "Hi! 👋 I'm Cartify AI. I can help you search the real Cartify "
-                "catalog, filter products by price/rating/brand/category, "
-                "compare products, and answer follow-up questions."
-            )
-
-        if "what can you help" in text or "what do you do" in text:
-            return (
-                "I can search the Cartify catalog, filter by price, rating, "
-                "brand or category, compare the products we found, and keep "
-                "track of products during this conversation."
-            )
-
-        if text in {"food", "foods"}:
-            return (
-                "I can help with products available in Cartify. The current "
-                "catalog categories I can search are Sports, Electronics, "
-                "Beauty, Home and Clothing. I don't see a Food category in "
-                "the current catalog."
-            )
-
-        if not products:
-            if "api" in error.lower() or "key" in error.lower():
-                return (
-                    "I understood your question, but the AI service is not "
-                    "configured correctly yet. Check AI_API_KEY and AI_MODEL "
-                    "in the project's .env file."
+                payload = json.dumps(result, ensure_ascii=False, default=str)
+                if len(payload) > TOOL_RESULT_LIMIT:
+                    payload = payload[:TOOL_RESULT_LIMIT] + '…(truncated)"}'
+                messages.append(
+                    {"role": "tool", "tool_call_id": call["id"], "content": payload}
                 )
 
-            return (
-                "I understood your request, but I couldn't find a matching "
-                "product in the current Cartify catalog. Try a product name, "
-                "brand, category, subcategory, product ID, or a price such as "
-                "\"headphones under ₹5000\"."
-            )
+        if self._cancel and not final_text:
+            final_text = "Stopped."
+        if not final_text:
+            final_text = "I couldn't put an answer together. Please try rephrasing your question."
 
-        lines = [
-            "I found these real matches in the Cartify catalog:"
-        ]
+        unique, seen = [], set()
+        for product in shown:
+            if product.get("product_id") not in seen:
+                seen.add(product.get("product_id"))
+                unique.append(product)
 
-        for i, product in enumerate(products[:6], 1):
-            lines.append(
-                f"{i}. {product.get('product_id')} — "
-                f"{product.get('brand')} / {product.get('subcategory')} — "
-                f"₹{product.get('final_price')} — "
-                f"rating {product.get('rating')} — "
-                f"stock {product.get('stock')}"
-            )
+        return {"message": final_text, "products": unique[:8], "mode": "ai"}
 
-        return "\n".join(lines)
+    def _one_round(self, messages, offer_tools, on_text):
+        content, calls = "", []
+        for kind, payload in self.provider.stream_chat(
+            messages, offer_tools, cancel=lambda: self._cancel
+        ):
+            if kind == "text":
+                on_text(payload)
+            else:
+                content, calls = payload["content"], payload["tool_calls"]
+        return content, calls
 
-    def _finish(self, user_message, reply, products, ai_used):
-        self.state.messages.append(
-            {"role": "user", "content": user_message}
+    # ------------------------------------------------------------------
+    # helpers
+    # ------------------------------------------------------------------
+
+    def _system_prompt(self):
+        overview = tools.catalog_overview()
+        lines = []
+        for category, subs in sorted(overview.get("categories", {}).items()):
+            lines.append(f"- {category}: {', '.join(subs) if subs else '(no subcategories)'}")
+        text = "Categories and subcategories:\n" + "\n".join(lines) if lines else ""
+        if overview.get("brands"):
+            text += "\nBrands: " + ", ".join(overview["brands"])
+
+        previous = "\n".join(
+            f"{i}. {p.get('product_id')} — {p.get('brand')} {p.get('subcategory')}, "
+            f"₹{p.get('final_price')}, rating {p.get('rating')}"
+            for i, p in enumerate(self.last_products, 1)
         )
-        self.state.messages.append(
-            {"role": "assistant", "content": reply}
-        )
+        return build_system_prompt(text, previous)
 
-        # Keep only a bounded local conversation history.
-        self.state.messages = self.state.messages[-24:]
-
-        if products:
-            self.state.last_products = products
-
-        return {
-            "message": reply,
-            "products": format_products(products),
-            "ai": ai_used,
-        }
+    def _remember(self, message, result):
+        self.history.append({"role": "user", "content": message})
+        self.history.append({"role": "assistant", "content": result["message"]})
+        self.history = self.history[-HISTORY_LIMIT:]
+        if result.get("products"):
+            self.last_products = list(result["products"])
